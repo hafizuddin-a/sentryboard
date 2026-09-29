@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 android {
     defaultConfig {
-        applicationId "rkr.simplekeyboard.inputmethod"
+        applicationId "com.example.sentryboard"
         compileSdk 37
         minSdkVersion 24
         targetSdkVersion 37

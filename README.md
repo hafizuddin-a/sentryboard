@@ -1,3 +1,11 @@
+# Sentryboard
+
+Sentryboard is a modified fork of [Simple Keyboard](https://github.com/rkkr/simple-keyboard),
+which is itself based on AOSP LatinIME. It is licensed under Apache License 2.0; see
+[LICENSE](LICENSE) and [NOTICE](NOTICE). The rest of this README is upstream's, unchanged.
+
+---
+
 # Simple Keyboard
 
 [![Crowdin](https://d322cqt584bo4o.cloudfront.net/simple-keyboard/localized.svg)](https://crowdin.com/project/simple-keyboard)
