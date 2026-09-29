@@ -67,6 +67,29 @@
     <string name="wordblock_unlock_stay" translatable="false">Stay</string>
     <string name="wordblock_unlock_leave" translatable="false">Leave</string>
     <string name="wordblock_unlock_done" translatable="false">Unlocked. You can edit the settings for %1$s.</string>
+    <!-- Uninstall protection -->
+    <string name="settings_screen_protection" translatable="false">Uninstall protection</string>
+    <string name="protection_category" translatable="false">Uninstall protection</string>
+    <string name="protection_tamper_banner_title" translatable="false">Uninstall protection was turned off outside the app</string>
+    <string name="protection_tamper_banner_summary" translatable="false">Tap to turn it back on.</string>
+    <string name="protection_status_on" translatable="false">Uninstall protection is on</string>
+    <string name="protection_status_on_summary" translatable="false">Sentryboard is an active device admin, so Android will not let it be uninstalled until this is turned off.</string>
+    <string name="protection_status_off" translatable="false">Uninstall protection is off</string>
+    <string name="protection_status_off_summary" translatable="false">Sentryboard can be uninstalled at any time.</string>
+    <string name="protection_enable" translatable="false">Enable uninstall protection</string>
+    <string name="protection_enable_summary" translatable="false">You will be asked to activate Sentryboard as a device admin. It asks for no device policies, so it cannot lock, wipe or control your phone.</string>
+    <string name="protection_remove" translatable="false">Remove uninstall protection</string>
+    <string name="protection_remove_summary" translatable="false">Turn the device admin off so the app can be uninstalled.</string>
+    <string name="protection_remove_locked" translatable="false">Locked. Open Word filter, tap Unlock and wait for the countdown, then come back here.</string>
+    <string name="protection_remove_title" translatable="false">Remove uninstall protection?</string>
+    <string name="protection_remove_message" translatable="false">Sentryboard will be uninstallable again.</string>
+    <string name="protection_remove_failed" translatable="false">Could not remove protection. Unlock the settings first.</string>
+    <string name="protection_about" translatable="false">This slows uninstalling down; it is not a lock. A factory reset, safe mode or another device can always remove the app.</string>
+    <string name="protection_activate_explanation" translatable="false">Sentryboard asks to be a device admin only so that it cannot be uninstalled until you deactivate it first. It requests no device policies: it cannot lock, wipe or control your phone.</string>
+    <string name="protection_disable_message" translatable="false">Uninstall protection is on. To remove it, open Sentryboard, unlock the word filter settings, and choose \"Remove uninstall protection\".</string>
+    <string name="protection_alert_channel" translatable="false">Uninstall protection alerts</string>
+    <string name="protection_tamper_title" translatable="false">Uninstall protection was turned off</string>
+    <string name="protection_tamper_text" translatable="false">Open Sentryboard to turn it back on.</string>
     <string name="wordblock_list_category" translatable="false">Blocked words</string>
     <string name="wordblock_add" translatable="false">Add a word</string>
     <string name="wordblock_syntax_summary" translatable="false">word blocks that word only. word* also blocks longer words that start with it. word! blocks it and removes it the moment it is typed.</string>

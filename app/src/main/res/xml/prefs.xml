@@ -32,6 +32,10 @@
         android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.WordBlockSettingsFragment"
         android:title="@string/settings_screen_wordblock"
         android:key="screen_wordblock" />
+    <PreferenceScreen
+        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.ProtectionSettingsFragment"
+        android:title="@string/settings_screen_protection"
+        android:key="screen_protection" />
     <Preference
         android:title="@string/privacy_policy"
         android:key="privacy_policy" />

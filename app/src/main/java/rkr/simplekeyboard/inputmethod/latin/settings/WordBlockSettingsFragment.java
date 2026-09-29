@@ -86,6 +86,8 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         super.onCreate(icicle);
         addPreferencesFromResource(R.xml.prefs_screen_wordblock);
         final Context context = getActivity();
+        // An open unlock window ends when the settings are left (see SettingsPageWatcher).
+        SettingsPageWatcher.install(getActivity());
         mGate = SettingsGate.getInstance(context);
         mStore = BlockedWordStore.getInstance(context);
         mWriter = new FilterSettingsWriter(getSharedPreferences(), mGate);
@@ -137,12 +139,6 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     @Override
     public void onPause() {
         mHandler.removeCallbacks(mTick);
-        // Leaving the settings page closes an open edit window. This is onPause rather than onStop
-        // because onStop can arrive seconds late, after a newer unlock has completed. Rotating the
-        // screen recreates this page and is not leaving it.
-        if (!getActivity().isChangingConfigurations()) {
-            mGate.onSettingsPageLeft();
-        }
         super.onPause();
     }
 

@@ -17,6 +17,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- To tell the user if uninstall protection is turned off outside the app. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -63,6 +65,20 @@
             android:theme="@style/platformSettingsTheme"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|fontScale|density|layoutDirection|locale|colorMode"
             android:enableOnBackInvokedCallback="false" />
+
+        <!-- Uninstall protection: an active device admin cannot be uninstalled until it is
+             deactivated. No policies are declared (see xml/device_admin.xml). -->
+        <receiver
+            android:name=".latin.protection.ProtectionAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".latin.SystemBroadcastReceiver"

@@ -24,6 +24,7 @@ import rkr.simplekeyboard.inputmethod.latin.settings.AppearanceSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.KeyPressSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.LanguagesSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.PreferencesSettingsFragment;
+import rkr.simplekeyboard.inputmethod.latin.settings.ProtectionSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.SingleLanguageSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.ThemeSettingsFragment;
@@ -40,6 +41,7 @@ public class FragmentUtils {
         sLatinImeFragments.add(LanguagesSettingsFragment.class.getName());
         sLatinImeFragments.add(SingleLanguageSettingsFragment.class.getName());
         sLatinImeFragments.add(WordBlockSettingsFragment.class.getName());
+        sLatinImeFragments.add(ProtectionSettingsFragment.class.getName());
     }
 
     public static boolean isValidFragment(String fragmentName) {
