@@ -294,6 +294,76 @@ public class WordFilterTest {
         assertFalse(filter.isBlocked("entry5000x"));
     }
 
+    // --- '@' and '$' are word characters, but edge symbols do not hide a word ---
+
+    @Test
+    public void leetSymbolsAreWordCharacters() {
+        assertTrue(WordFilter.isWordCodePoint('@'));
+        assertTrue(WordFilter.isWordCodePoint('$'));
+        assertFalse(WordFilter.isWordCodePoint('#'));
+        assertFalse(WordFilter.isWordCodePoint('-'));
+        assertFalse(WordFilter.isWordCodePoint('.'));
+    }
+
+    @Test
+    public void disguisedWordsWithSymbolsInsideAreCaught() {
+        assertTrue(filterOf("cast").isBlocked("c@$t"));
+        assertTrue(filterOf("shat").isBlocked("sh@t"));
+        assertTrue(filterOf("sword").isBlocked("$w0rd"));
+        assertTrue(filterOf("pass").isBlocked("p@$$"));
+        assertTrue(filterOf("ass").isBlocked("@$$"));
+    }
+
+    @Test
+    public void edgeSymbolsDoNotLetABlockedWordThrough() {
+        final WordFilter filter = filterOf("ass");
+        assertTrue(filter.isBlocked("@ass"));
+        assertTrue(filter.isBlocked("$ass"));
+        assertTrue(filter.isBlocked("ass$"));
+        assertTrue(filter.isBlocked("ass@"));
+        assertTrue(filter.isBlocked("@ass$"));
+        assertTrue(filter.isBlocked("$$ass@@"));
+        assertTrue(filter.isBlocked("@ASS"));
+    }
+
+    @Test
+    public void edgeSymbolsWorkForWildcardsAndInstantEntries() {
+        assertTrue(filterOf("word*").isBlocked("@words"));
+        assertTrue(filterOf("word*").isBlocked("wording$"));
+        assertTrue(filterOf("xyz!").isInstant("@xyz"));
+        assertTrue(filterOf("xyz!").isInstant("xyz$"));
+        assertTrue(filterOf("xyz!").isBlocked("@xyz"));
+    }
+
+    @Test
+    public void symbolsInsideALongerWordStillGuardAgainstFalsePositives() {
+        final WordFilter filter = filterOf("ass");
+        assertFalse(filter.isBlocked("cl@ss"));    // class
+        assertFalse(filter.isBlocked("p@ss"));     // pass
+        assertFalse(filter.isBlocked("@ssignment"));
+        assertFalse(filter.isBlocked("user@ass"));  // one word, not "ass" after an address
+        assertFalse(filter.isBlocked("a$$e$$"));
+    }
+
+    @Test
+    public void wordMadeOnlyOfSymbolsIsNotBlockedByAnEmptyReading() {
+        final WordFilter filter = filterOf("word");
+        assertFalse(filter.isBlocked("@"));
+        assertFalse(filter.isBlocked("$$"));
+        assertFalse(filter.isBlocked("@$"));
+    }
+
+    @Test
+    public void trailingWordLengthIncludesLeetSymbols() {
+        assertEquals(4, WordFilter.trailingWordLength("say sh@t"));
+        assertEquals(4, WordFilter.trailingWordLength("well, @ass"));
+        assertEquals(2, WordFilter.trailingWordLength("costs $5"));
+        assertEquals(1, WordFilter.trailingWordLength("hi @"));
+        assertEquals(12, WordFilter.trailingWordLength("mail me@x.com user@example"));
+        assertEquals(0, WordFilter.trailingWordLength("a # "));
+        assertEquals(0, WordFilter.trailingWordLength("a@b "));
+    }
+
     // --- trailingWordLength ---
 
     @Test

@@ -17,7 +17,7 @@ the word is deleted and the separator you typed is inserted as usual. There is n
 Matching is by **whole word** and forgiving about disguise. Both the typed word and each list entry are
 normalized the same way before they are compared: accents are removed (`wórd` = `word`), case is
 ignored, apostrophes are ignored (`don't` = `dont`), and common leet substitutions are mapped
-(`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s). A blocked `ass` never matches inside a
+(`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s), so `sh@t` is read as `shat`. A blocked `ass` never matches inside a
 longer word such as `class`, `assignment` or `pass`.
 
 ### Entry syntax
@@ -30,7 +30,7 @@ One entry per line in *Settings > Word filter*:
 | `word*` | Also blocks longer words that start with `word` (`words`, `wording`, but not `sword`). |
 | `word!` | Blocks exactly that word **and removes it the instant it is typed**, without waiting for a separator. Use it only for words that are not the start of harmless words: with `ass!`, typing `assess` deletes `ass` as soon as its third letter is typed. |
 
-An entry must be a single word of letters, digits and apostrophes, optionally ending in `*` or `!`.
+An entry must be a single word of letters, digits, apostrophes, `@` and `$`, optionally ending in `*` or `!`.
 Anything else (spaces, hyphens, other punctuation) could never match a typed word and is rejected.
 
 ### Settings
@@ -65,8 +65,10 @@ phone and date fields, and fields that declare no input type are never touched.
   (Indic scripts, Thai, Arabic vowel marks) is compared without those marks and can match other words
   with the same base letters. Word boundaries in such scripts are also approximate, since combining
   marks are not word characters.
-- `@` and `$` count as leet letters when a word is compared, but as separators when a word is *typed*,
-  so `w@rd` is seen as `w`, `@`, `rd` and is not caught. `$word` is caught, as `word`.
+- `@` and `$` are word characters, so a disguised word like `sh@t` or `w$rd` is one word and is caught.
+  At the very start or end of a word they are ignored when matching, so `@word` and `word$` are still
+  caught. The flip side is that `me@word.com` is treated as the single word `me@word`, so `word` is not
+  caught inside an address.
 - Multi-word phrases are not supported.
 
 ## Building

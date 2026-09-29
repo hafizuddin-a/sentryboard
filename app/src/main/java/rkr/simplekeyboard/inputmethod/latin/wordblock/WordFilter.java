@@ -104,17 +104,19 @@ public final class WordFilter {
         if (isEmpty() || word == null || word.length() == 0) {
             return false;
         }
-        for (final String variant : variantsOf(word)) {
-            if (variant.isEmpty()) {
-                continue;
-            }
-            if (mWholeWords.contains(variant)) {
-                return true;
-            }
-            final int longest = Math.min(variant.length(), mMaxStemLength);
-            for (int length = longest; length >= mMinStemLength; length--) {
-                if (mStems.contains(variant.substring(0, length))) {
+        for (final CharSequence candidate : candidates(word)) {
+            for (final String variant : variantsOf(candidate)) {
+                if (variant.isEmpty()) {
+                    continue;
+                }
+                if (mWholeWords.contains(variant)) {
                     return true;
+                }
+                final int longest = Math.min(variant.length(), mMaxStemLength);
+                for (int length = longest; length >= mMinStemLength; length--) {
+                    if (mStems.contains(variant.substring(0, length))) {
+                        return true;
+                    }
                 }
             }
         }
@@ -129,12 +131,47 @@ public final class WordFilter {
         if (mInstantWords.isEmpty() || word == null || word.length() == 0) {
             return false;
         }
-        for (final String variant : variantsOf(word)) {
-            if (mInstantWords.contains(variant)) {
-                return true;
+        for (final CharSequence candidate : candidates(word)) {
+            for (final String variant : variantsOf(candidate)) {
+                if (mInstantWords.contains(variant)) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    /**
+     * The readings of a typed word that are worth comparing: the word itself and, if it starts or
+     * ends with {@code @} or {@code $}, the word without those edge symbols. Inside a word they
+     * stand for letters ({@code sh@t}), but at an edge they are far more likely to be a mention,
+     * a price or other punctuation ({@code @word}, {@code word$}), and must not let a blocked word
+     * through.
+     */
+    private static List<CharSequence> candidates(final CharSequence word) {
+        final List<CharSequence> result = new ArrayList<>(4);
+        result.add(word);
+        int start = 0;
+        int end = word.length();
+        while (start < end && isLeetSymbol(word.charAt(start))) {
+            start++;
+        }
+        while (end > start && isLeetSymbol(word.charAt(end - 1))) {
+            end--;
+        }
+        if (start == end) {
+            return result; // Nothing but symbols.
+        }
+        if (start > 0) {
+            result.add(word.subSequence(start, word.length()));
+        }
+        if (end < word.length()) {
+            result.add(word.subSequence(0, end));
+        }
+        if (start > 0 && end < word.length()) {
+            result.add(word.subSequence(start, end));
+        }
+        return result;
     }
 
     /** @return true if at least one entry is marked with {@code !}. */
@@ -150,9 +187,18 @@ public final class WordFilter {
         return mMaxEntryLength;
     }
 
-    /** Word characters are letters, digits and apostrophes. Everything else separates words. */
+    /**
+     * Word characters are letters, digits, apostrophes and the leet symbols {@code @} and
+     * {@code $}, so that a disguised word such as {@code w@rd} or {@code sh$t} is one word.
+     * Everything else separates words.
+     */
     public static boolean isWordCodePoint(final int codePoint) {
-        return Character.isLetterOrDigit(codePoint) || codePoint == '\'' || codePoint == '\u2019';
+        return Character.isLetterOrDigit(codePoint) || codePoint == '\'' || codePoint == '\u2019'
+                || isLeetSymbol(codePoint);
+    }
+
+    private static boolean isLeetSymbol(final int codePoint) {
+        return codePoint == '@' || codePoint == '$';
     }
 
     /**
