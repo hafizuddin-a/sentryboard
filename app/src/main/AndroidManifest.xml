@@ -14,13 +14,24 @@
      limitations under the License.
 -->
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- To tell the user if uninstall protection is turned off outside the app. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The guard (see latin/protection/GuardService). Each of these is explained in the README. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Granted by the user under "Usage access": lets the guard see which screen is in front. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- Granted by the user under "Display over other apps": draws the cover. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
+        android:name=".latin.SentryboardApplication"
         android:allowBackup="false"
         android:fullBackupOnly="true"
         android:fullBackupContent="@xml/backup_rules"
@@ -77,6 +88,34 @@
                 android:resource="@xml/device_admin" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- The guard's cover, started on top of a guarded screen. Its own task, kept out of
+             Recents. Back is handled by the activity (it goes Home). -->
+        <activity
+            android:name=".latin.protection.GuardCoverActivity"
+            android:exported="false"
+            android:theme="@style/platformSettingsTheme"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:enableOnBackInvokedCallback="false" />
+
+        <service
+            android:name=".latin.protection.GuardService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Watches which screen is in front and covers the device admin deactivation screen while the user's own settings lock is on, so that removing uninstall protection needs the unlock countdown. Always shows a notification." />
+        </service>
+
+        <receiver
+            android:name=".latin.protection.GuardBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 

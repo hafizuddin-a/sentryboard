@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.latin.protection.GuardService;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.BlockedWordStore;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.FilterSettingsWriter;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.WordFilter;
@@ -86,8 +87,6 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         super.onCreate(icicle);
         addPreferencesFromResource(R.xml.prefs_screen_wordblock);
         final Context context = getActivity();
-        // An open unlock window ends when the settings are left (see SettingsPageWatcher).
-        SettingsPageWatcher.install(getActivity());
         mGate = SettingsGate.getInstance(context);
         mStore = BlockedWordStore.getInstance(context);
         mWriter = new FilterSettingsWriter(getSharedPreferences(), mGate);
@@ -161,6 +160,8 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
 
         refreshLockSection(state);
         refreshList(editable);
+        // Locking turns the guard on; start it if protection is on.
+        GuardService.ensureRunning(getActivity());
         if (state == SettingsLock.State.UNLOCKED) {
             mHandler.postDelayed(mTick, 1000);
         }

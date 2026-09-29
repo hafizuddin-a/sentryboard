@@ -18,6 +18,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
 
+import rkr.simplekeyboard.inputmethod.latin.protection.GuardService;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsGate;
 
 /**
@@ -25,12 +26,14 @@ import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsGate;
  * {@link SettingsActivity} and not one of its sub screens: moving between "Word filter" and
  * "Uninstall protection" is still being on the settings page.
  *
+ * It also restarts the uninstall-protection guard whenever the settings screen comes to the front.
+ *
  * It is a lifecycle callback rather than code in the activity so that upstream's
  * {@code SettingsActivity} stays untouched. It listens for {@code onPause}, which arrives the
  * moment the page is covered; {@code onStop} can arrive seconds late, after a newer unlock has
  * completed. Rotating the screen recreates the activity and is not leaving it.
  */
-final class SettingsPageWatcher implements Application.ActivityLifecycleCallbacks {
+public final class SettingsPageWatcher implements Application.ActivityLifecycleCallbacks {
     private static boolean sInstalled;
 
     private final SettingsGate mGate;
@@ -39,14 +42,14 @@ final class SettingsPageWatcher implements Application.ActivityLifecycleCallback
         mGate = gate;
     }
 
-    /** Starts watching, once per process. Call from any settings screen that depends on the lock. */
-    static synchronized void install(final Activity activity) {
+    /** Starts watching, once per process. */
+    public static synchronized void install(final Application application) {
         if (sInstalled) {
             return;
         }
         sInstalled = true;
-        activity.getApplication().registerActivityLifecycleCallbacks(
-                new SettingsPageWatcher(SettingsGate.getInstance(activity)));
+        application.registerActivityLifecycleCallbacks(
+                new SettingsPageWatcher(SettingsGate.getInstance(application)));
     }
 
     @Override
@@ -66,6 +69,12 @@ final class SettingsPageWatcher implements Application.ActivityLifecycleCallback
 
     @Override
     public void onActivityResumed(final Activity activity) {
+        if (activity instanceof SettingsActivity) {
+            // The app is on screen, which is when Android lets a foreground service be started from
+            // it. Covers a process that was started in the background (by the keyboard, say),
+            // where Application.onCreate could not start the guard.
+            GuardService.ensureRunning(activity);
+        }
     }
 
     @Override

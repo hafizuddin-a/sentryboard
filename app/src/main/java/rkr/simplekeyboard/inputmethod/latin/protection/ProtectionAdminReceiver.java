@@ -37,6 +37,7 @@ public final class ProtectionAdminReceiver extends DeviceAdminReceiver {
         // Protection is on again, so whatever was reported no longer applies.
         ProtectionStore.get(context).clearTamper();
         TamperNotifier.cancel(context);
+        GuardService.ensureRunning(context);
     }
 
     @Override

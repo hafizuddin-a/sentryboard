@@ -90,6 +90,42 @@
     <string name="protection_alert_channel" translatable="false">Uninstall protection alerts</string>
     <string name="protection_tamper_title" translatable="false">Uninstall protection was turned off</string>
     <string name="protection_tamper_text" translatable="false">Open Sentryboard to turn it back on.</string>
+    <!-- Guard -->
+    <string name="guard_channel_name" translatable="false">Uninstall protection guard</string>
+    <string name="guard_notification_title" translatable="false">Uninstall protection active</string>
+    <string name="guard_notification_text" translatable="false">Covering the device admin screen while your settings lock is on.</string>
+    <string name="guard_notification_degraded_title" translatable="false">Uninstall protection is degraded</string>
+    <string name="guard_notification_degraded_text" translatable="false">Not working until you allow: %1$s. Tap to fix.</string>
+    <string name="guard_cover_title" translatable="false">Uninstall protection is locked</string>
+    <string name="guard_cover_body" translatable="false">Unlock in the app and wait for the countdown to remove it.</string>
+    <string name="guard_cover_open_app" translatable="false">Open app</string>
+    <string name="guard_cover_go_home" translatable="false">Go home</string>
+    <string name="guard_req_device_admin" translatable="false">Device admin</string>
+    <string name="guard_req_usage_access" translatable="false">Usage access</string>
+    <string name="guard_req_overlay" translatable="false">Display over other apps</string>
+    <string name="guard_req_notifications" translatable="false">Notifications</string>
+    <string name="guard_setup_category" translatable="false">Guard setup</string>
+    <string name="guard_state_working" translatable="false">The guard is working</string>
+    <string name="guard_state_working_summary" translatable="false">While your settings lock is on, the device admin screen is covered. This screen is what an Android phone shows to switch protection off.</string>
+    <string name="guard_state_idle" translatable="false">The guard is standing by</string>
+    <string name="guard_state_idle_summary" translatable="false">It only covers the device admin screen while the settings lock is on. Turn the lock on in Word filter.</string>
+    <string name="guard_state_unlocked_summary" translatable="false">The settings are unlocked for editing, so the guard is paused. It resumes when they lock again.</string>
+    <string name="guard_state_degraded" translatable="false">The guard is not working</string>
+    <string name="guard_state_degraded_summary" translatable="false">Allow the items marked with a cross below. Until then the device admin screen is not covered.</string>
+    <string name="guard_state_blocked" translatable="false">Android is blocking the cover</string>
+    <string name="guard_state_blocked_summary" translatable="false">The guard saw the device admin screen but could not cover it. Check that Sentryboard is allowed to run in the background (see Battery optimization below), and see the README.</string>
+    <string name="guard_notification_blocked_text" translatable="false">Android is blocking the cover on this phone. Tap for details.</string>
+    <string name="guard_row_fix" translatable="false">Tap to allow.</string>
+    <string name="guard_row_ok" translatable="false">Allowed.</string>
+    <string name="guard_req_device_admin_summary" translatable="false">Needed so Android refuses to uninstall the app.</string>
+    <string name="guard_req_usage_access_summary" translatable="false">Needed to see which screen is showing. It reads nothing else.</string>
+    <string name="guard_req_overlay_summary" translatable="false">Needed to draw the cover over the device admin screen.</string>
+    <string name="guard_req_notifications_summary" translatable="false">Needed so the guard is never running unseen.</string>
+    <string name="guard_battery" translatable="false">Battery optimization (optional)</string>
+    <string name="guard_battery_summary" translatable="false">Some phones stop background services to save power. If the guard stops working, exempt Sentryboard here.</string>
+    <string name="guard_diagnostic" translatable="false">Foreground readout (test builds only)</string>
+    <string name="guard_diagnostic_summary" translatable="false">Shows the package and class of the screen in front, to find the names to put in guard_targets.xml. Stores nothing.</string>
+    <string name="guard_diagnostic_needs" translatable="false">Turn on Usage access and Display over other apps first.</string>
     <string name="wordblock_list_category" translatable="false">Blocked words</string>
     <string name="wordblock_add" translatable="false">Add a word</string>
     <string name="wordblock_syntax_summary" translatable="false">word blocks that word only. word* also blocks longer words that start with it. word! blocks it and removes it the moment it is typed.</string>
