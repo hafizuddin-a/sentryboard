@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Strings for the word filter. Kept out of strings.xml (which is translated through Crowdin)
+     so that upstream merges stay clean, and marked translatable="false" so that release lint
+     does not flag them as missing in every locale.
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<resources>
+    <string name="settings_screen_wordblock" translatable="false">Word filter</string>
+    <string name="wordblock_enabled" translatable="false">Remove blocked words</string>
+    <string name="wordblock_enabled_summary" translatable="false">Delete words on your list as soon as you finish typing them. Password and number fields are never touched.</string>
+    <string name="wordblock_list_category" translatable="false">Blocked words</string>
+    <string name="wordblock_add" translatable="false">Add a word</string>
+    <string name="wordblock_syntax_summary" translatable="false">word blocks that word only. word* also blocks longer words that start with it. word! blocks it and removes it the moment it is typed.</string>
+    <string name="wordblock_empty" translatable="false">No blocked words yet</string>
+    <string name="wordblock_locked" translatable="false">Editing the list is locked</string>
+    <string name="wordblock_add_title" translatable="false">Add a blocked word</string>
+    <string name="wordblock_add_hint" translatable="false">word, word* or word!</string>
+    <string name="wordblock_add_confirm" translatable="false">Add</string>
+    <string name="wordblock_remove_title" translatable="false">Remove from list?</string>
+    <string name="wordblock_remove_confirm" translatable="false">Remove</string>
+    <string name="wordblock_invalid" translatable="false">Use one word made of letters, digits and apostrophes, optionally ending in * or !</string>
+    <string name="wordblock_duplicate" translatable="false">That word is already on the list</string>
+    <string name="wordblock_save_failed" translatable="false">Could not save the list</string>
+</resources>

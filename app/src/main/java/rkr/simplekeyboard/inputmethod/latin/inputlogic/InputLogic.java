@@ -37,6 +37,7 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.utils.InputTypeUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.RecapitalizeStatus;
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils;
+import rkr.simplekeyboard.inputmethod.latin.wordblock.WordBlockController;
 
 /**
  * This class manages the input logic.
@@ -48,6 +49,7 @@ public final class InputLogic {
     // This has package visibility so it can be accessed from InputLogicHandler.
     public final RichInputConnection mConnection;
     private final RecapitalizeStatus mRecapitalizeStatus = new RecapitalizeStatus();
+    private final WordBlockController mWordBlock;
 
     /**
      * Create a new instance of the input logic.
@@ -57,6 +59,7 @@ public final class InputLogic {
     public InputLogic(final LatinIME latinIME) {
         mLatinIME = latinIME;
         mConnection = new RichInputConnection(latinIME);
+        mWordBlock = new WordBlockController(latinIME, mConnection);
     }
 
     /**
@@ -93,7 +96,13 @@ public final class InputLogic {
         final String rawText = event.getTextToCommit().toString();
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
         final String text = performSpecificTldProcessingOnTextInput(rawText);
-        mConnection.commitText(text, 1);
+        final boolean wordRemoved = mWordBlock.beforeSeparator(settingsValues,
+                getCurrentInputEditorInfo(), text.isEmpty() ? -1 : text.codePointAt(0));
+        try {
+            mConnection.commitText(text, 1);
+        } finally {
+            if (wordRemoved) mConnection.endBatchEdit();
+        }
         // Space state must be updated before calling updateShiftState
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
         return inputTransaction;
@@ -138,7 +147,7 @@ public final class InputLogic {
             } else if (currentEvent.isFunctionalKeyEvent()) {
                 handleFunctionalEvent(currentEvent, inputTransaction);
             } else {
-                handleNonFunctionalEvent(currentEvent, inputTransaction);
+                handleNonFunctionalEventWithWordBlock(currentEvent, inputTransaction);
             }
             currentEvent = currentEvent.mNextEvent;
         }
@@ -204,9 +213,13 @@ public final class InputLogic {
                 mConnection.pasteClipboard();
                 break;
             case Constants.CODE_ACTION_NEXT:
+                mWordBlock.beforeEditorAction(inputTransaction.mSettingsValues,
+                        getCurrentInputEditorInfo());
                 performEditorAction(EditorInfo.IME_ACTION_NEXT);
                 break;
             case Constants.CODE_ACTION_PREVIOUS:
+                mWordBlock.beforeEditorAction(inputTransaction.mSettingsValues,
+                        getCurrentInputEditorInfo());
                 performEditorAction(EditorInfo.IME_ACTION_PREVIOUS);
                 break;
             case Constants.CODE_LANGUAGE_SWITCH:
@@ -218,6 +231,28 @@ public final class InputLogic {
                 break;
             default:
                 throw new RuntimeException("Unknown key code : " + event.mKeyCode);
+        }
+    }
+
+    /**
+     * Handle a non-functional event, first removing a blocked word that this event completes.
+     *
+     * If a word was removed, the removal and the event's own edit share one batch edit. Enter is
+     * left out here: it may become an editor action, which must not run inside a batch, so it is
+     * handled where it makes that choice.
+     *
+     * @param event The event to handle.
+     * @param inputTransaction The transaction in progress.
+     */
+    private void handleNonFunctionalEventWithWordBlock(final Event event,
+            final InputTransaction inputTransaction) {
+        final boolean wordRemoved = event.mCodePoint != Constants.CODE_ENTER
+                && mWordBlock.beforeSeparator(inputTransaction.mSettingsValues,
+                        getCurrentInputEditorInfo(), event.mCodePoint);
+        try {
+            handleNonFunctionalEvent(event, inputTransaction);
+        } finally {
+            if (wordRemoved) mConnection.endBatchEdit();
         }
     }
 
@@ -234,6 +269,8 @@ public final class InputLogic {
             final InputTransaction inputTransaction) {
         switch (event.mCodePoint) {
             case Constants.CODE_ENTER:
+                mWordBlock.beforeEditorAction(inputTransaction.mSettingsValues,
+                        getCurrentInputEditorInfo());
                 final EditorInfo editorInfo = getCurrentInputEditorInfo();
                 final int imeOptionsActionId =
                         InputTypeUtils.getImeOptionsActionIdFromEditorInfo(editorInfo);

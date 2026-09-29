@@ -298,6 +298,16 @@ public final class RichInputConnection {
         return Character.codePointBefore(mTextBeforeCursor, length);
     }
 
+    /**
+     * Reads up to {@code n} chars before the cursor straight from the editor, not from the cache.
+     *
+     * @return the text, or null if there is no connection or the editor returned nothing.
+     */
+    public CharSequence getTextBeforeCursor(final int n) {
+        mIC = mLatinIME.getCurrentInputConnection();
+        return isConnected() ? mIC.getTextBeforeCursor(n, 0) : null;
+    }
+
     public void replaceText(final int startPosition, final int endPosition, CharSequence text) {
         if (mExpectedSelStart != mExpectedSelEnd) {
             Log.e(TAG, "replaceText called with text range selected");
