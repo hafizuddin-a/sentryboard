@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and lower. The blocked-word list must never leave the device. -->
+<full-backup-content>
+    <exclude domain="device_file" path="blocked_words.txt" />
+    <exclude domain="device_file" path="blocked_words.txt.tmp" />
+    <exclude domain="file" path="blocked_words.txt" />
+    <exclude domain="file" path="blocked_words.txt.tmp" />
+</full-backup-content>

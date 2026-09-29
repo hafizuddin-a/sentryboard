@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and higher. The blocked-word list must never leave the device. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="device_file" path="blocked_words.txt" />
+        <exclude domain="device_file" path="blocked_words.txt.tmp" />
+        <exclude domain="file" path="blocked_words.txt" />
+        <exclude domain="file" path="blocked_words.txt.tmp" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="device_file" path="blocked_words.txt" />
+        <exclude domain="device_file" path="blocked_words.txt.tmp" />
+        <exclude domain="file" path="blocked_words.txt" />
+        <exclude domain="file" path="blocked_words.txt.tmp" />
+    </device-transfer>
+</data-extraction-rules>
