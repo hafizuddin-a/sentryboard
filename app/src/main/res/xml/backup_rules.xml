@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 11 and lower. The blocked-word list must never leave the device. -->
+<!-- Android 11 and lower. Backups are turned off (allowBackup="false") and everything is excluded
+     as well, so that the settings lock and the blocked-word list can never be restored from an
+     older copy. -->
 <full-backup-content>
-    <exclude domain="device_file" path="blocked_words.txt" />
-    <exclude domain="device_file" path="blocked_words.txt.tmp" />
-    <exclude domain="file" path="blocked_words.txt" />
-    <exclude domain="file" path="blocked_words.txt.tmp" />
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
 </full-backup-content>

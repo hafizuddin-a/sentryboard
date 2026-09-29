@@ -25,6 +25,48 @@
     <string name="wordblock_idle_summary" translatable="false">Also remove a blocked word if you stop typing for a moment, so it is gone before you tap an app\'s Send button. It can also cut short a word you type slowly, so it is off by default.</string>
     <string name="wordblock_idle_delay" translatable="false">Pause length</string>
     <string name="wordblock_idle_delay_format" translatable="false">%1$d ms</string>
+    <!-- Settings lock -->
+    <string name="wordblock_lock_category" translatable="false">Settings lock</string>
+    <string name="wordblock_lock_status_off" translatable="false">Settings lock is off</string>
+    <string name="wordblock_lock_status_off_summary" translatable="false">Anyone holding this phone can change the word filter. Lock it so that changing it takes a countdown.</string>
+    <string name="wordblock_lock_status_locked" translatable="false">Settings are locked</string>
+    <string name="wordblock_lock_status_locked_summary" translatable="false">The word filter can be viewed but not changed. To change it, tap Unlock and stay on the unlock page for %1$s.</string>
+    <string name="wordblock_lock_status_unlocked" translatable="false">Unlocked for editing</string>
+    <string name="wordblock_lock_status_unlocked_summary" translatable="false">Locks again when you leave this screen, or in %1$s.</string>
+    <string name="wordblock_lock_lock" translatable="false">Lock settings</string>
+    <string name="wordblock_lock_lock_summary" translatable="false">Choose how long the unlock countdown will be.</string>
+    <string name="wordblock_lock_unlock" translatable="false">Unlock</string>
+    <string name="wordblock_lock_unlock_summary" translatable="false">Start the countdown (%1$s).</string>
+    <string name="wordblock_lock_now" translatable="false">Lock now</string>
+    <string name="wordblock_lock_duration" translatable="false">Countdown length</string>
+    <string name="wordblock_lock_duration_locked" translatable="false">%1$s. Fixed while locked.</string>
+    <string name="wordblock_lock_remove" translatable="false">Remove lock</string>
+    <string name="wordblock_lock_remove_summary" translatable="false">Turn the lock off completely.</string>
+    <string name="wordblock_lock_remove_locked" translatable="false">Unlock first.</string>
+    <string name="wordblock_lock_pick_title" translatable="false">Countdown length</string>
+    <string name="wordblock_lock_custom" translatable="false">Custom</string>
+    <string name="wordblock_lock_custom_title" translatable="false">Custom countdown</string>
+    <string name="wordblock_lock_hours" translatable="false">Hours</string>
+    <string name="wordblock_lock_minutes" translatable="false">Minutes</string>
+    <string name="wordblock_lock_seconds" translatable="false">Seconds (test builds only)</string>
+    <string name="wordblock_lock_range_error" translatable="false">Choose between %1$s and %2$s.</string>
+    <string name="wordblock_lock_confirm_title" translatable="false">Lock settings?</string>
+    <string name="wordblock_lock_confirm_message" translatable="false">You won\'t be able to edit these settings until you wait %1$s on the unlock page. Continue?</string>
+    <string name="wordblock_lock_confirm_yes" translatable="false">Lock</string>
+    <string name="wordblock_lock_remove_title" translatable="false">Remove the lock?</string>
+    <string name="wordblock_lock_remove_message" translatable="false">The word filter settings will be editable by anyone holding the phone.</string>
+    <string name="wordblock_lock_failed" translatable="false">Could not change the lock</string>
+    <string name="wordblock_lock_saving_failed" translatable="false">Could not save the lock, so it was not turned on</string>
+    <!-- Unlock page -->
+    <string name="wordblock_unlock_title" translatable="false">Unlocking settings</string>
+    <string name="wordblock_unlock_instruction" translatable="false">Stay on this screen until the countdown finishes</string>
+    <string name="wordblock_unlock_cancel" translatable="false">Cancel</string>
+    <string name="wordblock_unlock_reset_note" translatable="false">Countdown was reset because you left the page.</string>
+    <string name="wordblock_unlock_leave_title" translatable="false">Leave the unlock page?</string>
+    <string name="wordblock_unlock_leave_message" translatable="false">Leaving resets the countdown.</string>
+    <string name="wordblock_unlock_stay" translatable="false">Stay</string>
+    <string name="wordblock_unlock_leave" translatable="false">Leave</string>
+    <string name="wordblock_unlock_done" translatable="false">Unlocked. You can edit the settings for %1$s.</string>
     <string name="wordblock_list_category" translatable="false">Blocked words</string>
     <string name="wordblock_add" translatable="false">Add a word</string>
     <string name="wordblock_syntax_summary" translatable="false">word blocks that word only. word* also blocks longer words that start with it. word! blocks it and removes it the moment it is typed.</string>

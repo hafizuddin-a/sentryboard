@@ -15,7 +15,11 @@ import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
 
+import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.WriteGate;
+
 public class BlockedWordStoreTest {
+    private static final WriteGate OPEN = () -> true;
+
     @Rule
     public TemporaryFolder mFolder = new TemporaryFolder();
 
@@ -25,7 +29,7 @@ public class BlockedWordStoreTest {
 
     @Test
     public void missingFileMeansEmptyList() {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertTrue(store.getEntries().isEmpty());
         assertTrue(store.getFilter().isEmpty());
         assertFalse(store.getFilter().isBlocked("word"));
@@ -33,7 +37,7 @@ public class BlockedWordStoreTest {
 
     @Test
     public void addUpdatesTheFilterAndPersists() throws IOException {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertTrue(store.add("word"));
         assertTrue(store.add("other*"));
         assertTrue(store.getFilter().isBlocked("word"));
@@ -42,14 +46,14 @@ public class BlockedWordStoreTest {
 
         assertEquals("word\nother*\n", new String(Files.readAllBytes(file().toPath()), StandardCharsets.UTF_8));
 
-        final BlockedWordStore reloaded = new BlockedWordStore(file());
+        final BlockedWordStore reloaded = new BlockedWordStore(file(), OPEN);
         assertEquals(Arrays.asList("word", "other*"), reloaded.getEntries());
         assertTrue(reloaded.getFilter().isBlocked("word"));
     }
 
     @Test
     public void entriesAreTrimmedAndKeptAsTyped() {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertTrue(store.add("  Word!  "));
         assertEquals(Collections.singletonList("Word!"), store.getEntries());
         assertTrue(store.getFilter().isInstant("word"));
@@ -57,7 +61,7 @@ public class BlockedWordStoreTest {
 
     @Test
     public void rejectsUnusableEntries() {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertFalse(store.add(null));
         assertFalse(store.add(""));
         assertFalse(store.add("   "));
@@ -74,7 +78,7 @@ public class BlockedWordStoreTest {
 
     @Test
     public void rejectsDuplicatesIgnoringCase() {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertTrue(store.add("word"));
         assertFalse(store.add("word"));
         assertFalse(store.add("WORD"));
@@ -85,7 +89,7 @@ public class BlockedWordStoreTest {
 
     @Test
     public void removeUpdatesTheFilterAndPersists() {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         store.add("word");
         store.add("other");
         assertTrue(store.remove("word"));
@@ -94,23 +98,23 @@ public class BlockedWordStoreTest {
         assertFalse(store.remove("word"));
         assertFalse(store.remove(null));
 
-        assertEquals(Collections.singletonList("other"), new BlockedWordStore(file()).getEntries());
+        assertEquals(Collections.singletonList("other"), new BlockedWordStore(file(), OPEN).getEntries());
     }
 
     @Test
     public void loadSkipsBlankDuplicateAndUnusableLines() throws IOException {
         Files.write(file().toPath(),
                 "word\n\n  \nWORD\ntwo words\n *\nother!\r\n".getBytes(StandardCharsets.UTF_8));
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertEquals(Arrays.asList("word", "other!"), store.getEntries());
     }
 
     @Test
     public void nonAsciiEntriesSurviveAReload() {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertTrue(store.add("w\u00f3rd"));
         assertTrue(store.add("\u043f\u0440\u0438\u0432\u0435\u0442"));
-        final BlockedWordStore reloaded = new BlockedWordStore(file());
+        final BlockedWordStore reloaded = new BlockedWordStore(file(), OPEN);
         assertEquals(Arrays.asList("w\u00f3rd", "\u043f\u0440\u0438\u0432\u0435\u0442"), reloaded.getEntries());
         assertTrue(reloaded.getFilter().isBlocked("word"));
     }
@@ -121,7 +125,7 @@ public class BlockedWordStoreTest {
         final File blocker = file();
         assertTrue(blocker.mkdir());
         assertTrue(new File(blocker, "keep").createNewFile());
-        final BlockedWordStore store = new BlockedWordStore(blocker);
+        final BlockedWordStore store = new BlockedWordStore(blocker, OPEN);
         assertFalse(store.add("word"));
         assertTrue(store.getEntries().isEmpty());
         assertFalse(store.getFilter().isBlocked("word"));
@@ -130,7 +134,7 @@ public class BlockedWordStoreTest {
 
     @Test
     public void listCanBeReadWhileEditing() {
-        final BlockedWordStore store = new BlockedWordStore(file());
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         store.add("word");
         final java.util.List<String> snapshot = store.getEntries();
         store.add("other");
@@ -140,7 +144,43 @@ public class BlockedWordStoreTest {
     }
 
     @Test
-    public void editingIsCurrentlyAlwaysAllowed() {
-        assertTrue(new BlockedWordStore(file()).canEditBlockedList());
+    public void refusesToAddWhileLocked() {
+        final boolean[] locked = {true};
+        final BlockedWordStore store = new BlockedWordStore(file(), () -> !locked[0]);
+        assertFalse(store.add("word"));
+        assertTrue(store.getEntries().isEmpty());
+        assertFalse(file().exists());
+
+        locked[0] = false;
+        assertTrue(store.add("word"));
+    }
+
+    @Test
+    public void refusesToRemoveWhileLocked() throws IOException {
+        final boolean[] locked = {false};
+        final BlockedWordStore store = new BlockedWordStore(file(), () -> !locked[0]);
+        store.add("word");
+        locked[0] = true;
+        assertFalse(store.remove("word"));
+        assertEquals(Collections.singletonList("word"), store.getEntries());
+        assertTrue(store.getFilter().isBlocked("word"));
+        assertEquals("word\n", new String(Files.readAllBytes(file().toPath()), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void theListStaysReadableWhileLocked() {
+        final boolean[] locked = {false};
+        final BlockedWordStore store = new BlockedWordStore(file(), () -> !locked[0]);
+        store.add("word");
+        locked[0] = true;
+        assertEquals(Collections.singletonList("word"), store.getEntries());
+        assertTrue(store.getFilter().isBlocked("word"));
+    }
+
+    @Test
+    public void aLockedStoreStillLoadsItsFile() throws IOException {
+        Files.write(file().toPath(), "word\n".getBytes(StandardCharsets.UTF_8));
+        final BlockedWordStore store = new BlockedWordStore(file(), () -> false);
+        assertEquals(Collections.singletonList("word"), store.getEntries());
     }
 }

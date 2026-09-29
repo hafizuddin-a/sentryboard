@@ -19,7 +19,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:fullBackupOnly="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -52,6 +52,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- The countdown page. Rotation, font size and dark mode are handled in place so they do
+             not reset the countdown; leaving the page does (see UnlockActivity). Not exported, so
+             only this app can open it. Back is handled by the activity itself. -->
+        <activity
+            android:name=".latin.settings.UnlockActivity"
+            android:label="@string/wordblock_unlock_title"
+            android:exported="false"
+            android:theme="@style/platformSettingsTheme"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|fontScale|density|layoutDirection|locale|colorMode"
+            android:enableOnBackInvokedCallback="false" />
 
         <receiver
             android:name=".latin.SystemBroadcastReceiver"

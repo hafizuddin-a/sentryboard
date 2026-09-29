@@ -30,6 +30,8 @@ import java.util.Collections;
 import java.util.List;
 
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
+import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsGate;
+import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.WriteGate;
 
 /**
  * The user's blocked-word list: one entry per line in a private file, cached in memory.
@@ -55,12 +57,17 @@ public final class BlockedWordStore {
     private static BlockedWordStore sInstance;
 
     private final File mFile;
+    private final WriteGate mGate;
     private volatile List<String> mEntries = Collections.emptyList();
     private volatile WordFilter mFilter = new WordFilter(mEntries);
 
-    /** Creates a store backed by {@code file} and loads it. A missing or unreadable file is empty. */
-    public BlockedWordStore(final File file) {
+    /**
+     * Creates a store backed by {@code file} and loads it. A missing or unreadable file is empty.
+     * Changes are refused while {@code gate} says the settings are locked.
+     */
+    public BlockedWordStore(final File file, final WriteGate gate) {
         mFile = file;
+        mGate = gate;
         load();
     }
 
@@ -68,17 +75,10 @@ public final class BlockedWordStore {
     public static synchronized BlockedWordStore getInstance(final Context context) {
         if (sInstance == null) {
             final Context deviceContext = PreferenceManagerCompat.getDeviceContext(context);
-            sInstance = new BlockedWordStore(new File(deviceContext.getFilesDir(), FILE_NAME));
+            sInstance = new BlockedWordStore(new File(deviceContext.getFilesDir(), FILE_NAME),
+                    SettingsGate.getInstance(context));
         }
         return sInstance;
-    }
-
-    /**
-     * The single gate for changing the list. All list-editing UI goes through this so that a PIN
-     * or cooldown can be added in one place later.
-     */
-    public boolean canEditBlockedList() {
-        return true;
     }
 
     /** @return the current filter. Never null, and safe to call on every keystroke. */
@@ -94,10 +94,13 @@ public final class BlockedWordStore {
     /**
      * Adds an entry.
      *
-     * @return true if it was added; false if it is not a usable entry, is already in the list, or
-     * could not be saved (in which case the list is unchanged).
+     * @return true if it was added; false if the settings are locked, it is not a usable entry, it
+     * is already in the list, or it could not be saved (in which case the list is unchanged).
      */
     public synchronized boolean add(final String rawEntry) {
+        if (!mGate.canModifyFilterSettings()) {
+            return false;
+        }
         final String entry = clean(rawEntry);
         if (entry == null || indexOf(mEntries, entry) >= 0) {
             return false;
@@ -107,8 +110,11 @@ public final class BlockedWordStore {
         return commit(updated);
     }
 
-    /** @return true if an entry was removed. */
+    /** @return true if an entry was removed; false if the settings are locked or it is not listed. */
     public synchronized boolean remove(final String entry) {
+        if (!mGate.canModifyFilterSettings()) {
+            return false;
+        }
         final int index = indexOf(mEntries, entry == null ? "" : entry.trim());
         if (index < 0) {
             return false;

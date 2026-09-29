@@ -51,6 +51,26 @@ public final class LockSnapshot {
         this.bootCountAtUnlock = bootCountAtUnlock;
     }
 
+    @Override
+    public boolean equals(final Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof LockSnapshot)) {
+            return false;
+        }
+        final LockSnapshot that = (LockSnapshot) other;
+        return lockEnabled == that.lockEnabled && durationMs == that.durationMs
+                && unlocked == that.unlocked && unlockedAtElapsed == that.unlockedAtElapsed
+                && bootCountAtUnlock == that.bootCountAtUnlock;
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(lockEnabled, durationMs, unlocked, unlockedAtElapsed,
+                bootCountAtUnlock);
+    }
+
     /** No lock, as on a fresh install. */
     public static LockSnapshot none() {
         return new LockSnapshot(false, LockConstants.DEFAULT_DURATION_MS, false, 0, 0);

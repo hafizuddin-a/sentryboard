@@ -15,19 +15,47 @@
 
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     android:title="@string/settings_screen_wordblock">
+    <PreferenceCategory
+        android:key="lock_category"
+        android:title="@string/wordblock_lock_category">
+        <Preference
+            android:key="lock_status"
+            android:selectable="false" />
+        <Preference
+            android:key="lock_lock"
+            android:title="@string/wordblock_lock_lock"
+            android:summary="@string/wordblock_lock_lock_summary" />
+        <Preference
+            android:key="lock_unlock"
+            android:title="@string/wordblock_lock_unlock" />
+        <Preference
+            android:key="lock_now"
+            android:title="@string/wordblock_lock_now" />
+        <Preference
+            android:key="lock_duration"
+            android:title="@string/wordblock_lock_duration" />
+        <Preference
+            android:key="lock_remove"
+            android:title="@string/wordblock_lock_remove" />
+    </PreferenceCategory>
+    <!-- Not persistent: these are shown from, and written to, the preferences only through the
+         gated FilterSettingsWriter, so nothing can change them while the settings are locked. -->
     <SwitchPreference
         android:key="pref_wordblock_enabled"
+        android:persistent="false"
         android:title="@string/wordblock_enabled"
         android:summary="@string/wordblock_enabled_summary"
         android:defaultValue="true" />
     <SwitchPreference
         android:key="pref_wordblock_idle_enabled"
+        android:persistent="false"
         android:title="@string/wordblock_idle"
         android:summary="@string/wordblock_idle_summary"
         android:dependency="pref_wordblock_enabled"
         android:defaultValue="false" />
     <ListPreference
         android:key="pref_wordblock_idle_ms"
+        android:persistent="false"
         android:title="@string/wordblock_idle_delay"
         android:summary="%s"
         android:dependency="pref_wordblock_idle_enabled"
