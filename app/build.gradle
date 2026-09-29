@@ -24,4 +24,6 @@ android {
 }
 
 dependencies {
+    // Unit tests only; never packaged into the APK.
+    testImplementation 'junit:junit:4.13.2'
 }
