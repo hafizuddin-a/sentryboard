@@ -1,6 +1,27 @@
 apply plugin: 'com.android.application'
 
+// Release signing. The key and its passwords live outside the repository, in
+// ~/.sentryboard-signing/keystore.properties (or the file named by SENTRYBOARD_SIGNING_PROPERTIES),
+// with the keys storeFile, storePassword, keyAlias and keyPassword. Without that file the release
+// build is simply left unsigned, so other people's builds keep working.
+def signingPropertiesFile = file(System.getenv('SENTRYBOARD_SIGNING_PROPERTIES')
+        ?: "${System.getProperty('user.home')}/.sentryboard-signing/keystore.properties")
+def signingProperties = new Properties()
+if (signingPropertiesFile.isFile()) {
+    signingPropertiesFile.withInputStream { signingProperties.load(it) }
+}
+
 android {
+    if (signingProperties.containsKey('storeFile')) {
+        signingConfigs {
+            release {
+                storeFile file(signingProperties['storeFile'])
+                storePassword signingProperties['storePassword']
+                keyAlias signingProperties['keyAlias']
+                keyPassword signingProperties['keyPassword']
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.example.sentryboard"
         compileSdk 37
@@ -13,6 +34,9 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (signingProperties.containsKey('storeFile')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     namespace 'rkr.simplekeyboard.inputmethod'
