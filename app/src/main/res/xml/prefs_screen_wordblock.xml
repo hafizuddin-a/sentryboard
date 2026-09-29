@@ -20,6 +20,18 @@
         android:title="@string/wordblock_enabled"
         android:summary="@string/wordblock_enabled_summary"
         android:defaultValue="true" />
+    <SwitchPreference
+        android:key="pref_wordblock_idle_enabled"
+        android:title="@string/wordblock_idle"
+        android:summary="@string/wordblock_idle_summary"
+        android:dependency="pref_wordblock_enabled"
+        android:defaultValue="false" />
+    <ListPreference
+        android:key="pref_wordblock_idle_ms"
+        android:title="@string/wordblock_idle_delay"
+        android:summary="%s"
+        android:dependency="pref_wordblock_idle_enabled"
+        android:defaultValue="500" />
     <PreferenceCategory
         android:key="wordblock_list"
         android:title="@string/wordblock_list_category">

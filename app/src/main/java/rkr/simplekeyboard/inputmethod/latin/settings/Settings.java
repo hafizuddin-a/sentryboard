@@ -65,6 +65,9 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
     public static final String PREF_WORDBLOCK_ENABLED = "pref_wordblock_enabled";
+    public static final String PREF_WORDBLOCK_IDLE_ENABLED = "pref_wordblock_idle_enabled";
+    public static final String PREF_WORDBLOCK_IDLE_MS = "pref_wordblock_idle_ms";
+    public static final int DEFAULT_WORDBLOCK_IDLE_MS = 500;
 
     private static final float UNDEFINED_PREFERENCE_VALUE_FLOAT = -1.0f;
     private static final int UNDEFINED_PREFERENCE_VALUE_INT = -1;
@@ -254,6 +257,21 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static boolean readWordBlockEnabled(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_WORDBLOCK_ENABLED, true);
+    }
+
+    public static boolean readWordBlockIdleEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_WORDBLOCK_IDLE_ENABLED, false);
+    }
+
+    /** @return the idle delay in ms. Stored as a string by the list preference. */
+    public static int readWordBlockIdleMillis(final SharedPreferences prefs) {
+        try {
+            final int millis = Integer.parseInt(
+                    prefs.getString(PREF_WORDBLOCK_IDLE_MS, String.valueOf(DEFAULT_WORDBLOCK_IDLE_MS)));
+            return Math.max(100, Math.min(millis, 10000));
+        } catch (NumberFormatException e) {
+            return DEFAULT_WORDBLOCK_IDLE_MS;
+        }
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {

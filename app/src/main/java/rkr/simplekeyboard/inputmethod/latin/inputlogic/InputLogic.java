@@ -38,6 +38,7 @@ import rkr.simplekeyboard.inputmethod.latin.utils.InputTypeUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.RecapitalizeStatus;
 import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.WordBlockController;
+import rkr.simplekeyboard.inputmethod.latin.wordblock.WordFilter;
 
 /**
  * This class manages the input logic.
@@ -93,6 +94,7 @@ public final class InputLogic {
      * @return the complete transaction object
      */
     public InputTransaction onTextInput(final SettingsValues settingsValues, final Event event) {
+        mWordBlock.cancelIdleRemoval();
         final String rawText = event.getTextToCommit().toString();
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
         final String text = performSpecificTldProcessingOnTextInput(rawText);
@@ -105,6 +107,7 @@ public final class InputLogic {
         }
         // Space state must be updated before calling updateShiftState
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+        mWordBlock.scheduleIdleRemoval(settingsValues, getCurrentInputEditorInfo());
         return inputTransaction;
     }
 
@@ -139,6 +142,7 @@ public final class InputLogic {
      */
     public InputTransaction onCodeInput(final SettingsValues settingsValues, final Event event) {
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
+        mWordBlock.cancelIdleRemoval();
 
         Event currentEvent = event;
         while (null != currentEvent) {
@@ -151,7 +155,16 @@ public final class InputLogic {
             }
             currentEvent = currentEvent.mNextEvent;
         }
+        mWordBlock.scheduleIdleRemoval(settingsValues, getCurrentInputEditorInfo());
         return inputTransaction;
+    }
+
+    /**
+     * Drops any word removal that was scheduled for after a pause in typing. Call this when the
+     * input field goes away.
+     */
+    public void cancelPendingWordRemoval() {
+        mWordBlock.cancelIdleRemoval();
     }
 
     /**
@@ -239,7 +252,8 @@ public final class InputLogic {
      *
      * If a word was removed, the removal and the event's own edit share one batch edit. Enter is
      * left out here: it may become an editor action, which must not run inside a batch, so it is
-     * handled where it makes that choice.
+     * handled where it makes that choice. After a word character, an "instant" word that has just
+     * been completed is removed.
      *
      * @param event The event to handle.
      * @param inputTransaction The transaction in progress.
@@ -253,6 +267,10 @@ public final class InputLogic {
             handleNonFunctionalEvent(event, inputTransaction);
         } finally {
             if (wordRemoved) mConnection.endBatchEdit();
+        }
+        if (event.mCodePoint >= 0 && WordFilter.isWordCodePoint(event.mCodePoint)) {
+            mWordBlock.afterWordCharacter(inputTransaction.mSettingsValues,
+                    getCurrentInputEditorInfo(), event.mCodePoint);
         }
     }
 

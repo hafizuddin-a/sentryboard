@@ -480,6 +480,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onFinishInputInternal() {
         super.onFinishInput();
+        mInputLogic.cancelPendingWordRemoval();
 
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView != null) {
@@ -489,6 +490,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onFinishInputViewInternal(final boolean finishingInput) {
         super.onFinishInputView(finishingInput);
+        mInputLogic.cancelPendingWordRemoval();
     }
 
     protected void deallocateMemory() {

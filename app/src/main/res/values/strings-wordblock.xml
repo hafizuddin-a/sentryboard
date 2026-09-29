@@ -21,6 +21,10 @@
     <string name="settings_screen_wordblock" translatable="false">Word filter</string>
     <string name="wordblock_enabled" translatable="false">Remove blocked words</string>
     <string name="wordblock_enabled_summary" translatable="false">Delete words on your list as soon as you finish typing them. Password and number fields are never touched.</string>
+    <string name="wordblock_idle" translatable="false">Remove after a pause</string>
+    <string name="wordblock_idle_summary" translatable="false">Also remove a blocked word if you stop typing for a moment, so it is gone before you tap an app\'s Send button. It can also cut short a word you type slowly, so it is off by default.</string>
+    <string name="wordblock_idle_delay" translatable="false">Pause length</string>
+    <string name="wordblock_idle_delay_format" translatable="false">%1$d ms</string>
     <string name="wordblock_list_category" translatable="false">Blocked words</string>
     <string name="wordblock_add" translatable="false">Add a word</string>
     <string name="wordblock_syntax_summary" translatable="false">word blocks that word only. word* also blocks longer words that start with it. word! blocks it and removes it the moment it is typed.</string>

@@ -308,6 +308,16 @@ public final class RichInputConnection {
         return isConnected() ? mIC.getTextBeforeCursor(n, 0) : null;
     }
 
+    /**
+     * The last {@code n} chars before the cursor according to the local cache. This costs no round
+     * trip to the editor but may be out of date, so confirm with {@link #getTextBeforeCursor(int)}
+     * before acting on it.
+     */
+    public CharSequence getCachedTextBeforeCursor(final int n) {
+        final String text = mTextBeforeCursor;
+        return text.length() <= n ? text : text.substring(text.length() - n);
+    }
+
     public void replaceText(final int startPosition, final int endPosition, CharSequence text) {
         if (mExpectedSelStart != mExpectedSelEnd) {
             Log.e(TAG, "replaceText called with text range selected");

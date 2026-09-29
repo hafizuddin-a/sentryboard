@@ -137,6 +137,11 @@ public final class WordFilter {
         return false;
     }
 
+    /** @return true if at least one entry is marked with {@code !}. */
+    public boolean hasInstantEntries() {
+        return !mInstantWords.isEmpty();
+    }
+
     /**
      * @return the length of the longest normalized entry, in chars. Used to size the window of
      * text that is read back from the editor.

@@ -17,6 +17,7 @@ package rkr.simplekeyboard.inputmethod.latin.settings;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.os.Bundle;
+import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceCategory;
 import android.text.InputType;
@@ -34,7 +35,8 @@ import rkr.simplekeyboard.inputmethod.latin.wordblock.BlockedWordStore;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.WordFilter;
 
 /**
- * "Word filter" settings sub screen: the on/off switch and the editor for the blocked-word list.
+ * "Word filter" settings sub screen: the on/off switch, the optional removal after a pause, and
+ * the editor for the blocked-word list.
  *
  * Every change to the list goes through {@link BlockedWordStore#canEditBlockedList()}.
  */
@@ -50,6 +52,7 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     public void onCreate(final Bundle icicle) {
         super.onCreate(icicle);
         addPreferencesFromResource(R.xml.prefs_screen_wordblock);
+        setUpIdleDelayChoices();
         mStore = BlockedWordStore.getInstance(getActivity());
         mListCategory = (PreferenceCategory) findPreference(KEY_LIST_CATEGORY);
 
@@ -58,6 +61,20 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
             return true;
         });
         refreshList();
+    }
+
+    /** The pause length is chosen from a short list, stored as a string by the list preference. */
+    private void setUpIdleDelayChoices() {
+        final ListPreference delay = (ListPreference) findPreference(Settings.PREF_WORDBLOCK_IDLE_MS);
+        final int[] millis = {250, 500, 750, 1000, 1500, 2000};
+        final CharSequence[] entries = new CharSequence[millis.length];
+        final CharSequence[] values = new CharSequence[millis.length];
+        for (int i = 0; i < millis.length; i++) {
+            entries[i] = getString(R.string.wordblock_idle_delay_format, millis[i]);
+            values[i] = String.valueOf(millis[i]);
+        }
+        delay.setEntries(entries);
+        delay.setEntryValues(values);
     }
 
     private void refreshList() {

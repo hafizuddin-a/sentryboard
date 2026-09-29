@@ -203,6 +203,15 @@ public class WordFilterTest {
         assertTrue(filterOf("  word !  ").isInstant("word"));
     }
 
+    @Test
+    public void hasInstantEntries() {
+        assertFalse(filterOf("word", "other*").hasInstantEntries());
+        assertTrue(filterOf("word", "other!").hasInstantEntries());
+        assertFalse(new WordFilter(Collections.<String>emptyList()).hasInstantEntries());
+        // Instant entries that cannot match anything do not count.
+        assertFalse(filterOf("two words!").hasInstantEntries());
+    }
+
     // --- List hygiene ---
 
     @Test
