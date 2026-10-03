@@ -64,7 +64,6 @@ import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
-import rkr.simplekeyboard.inputmethod.latin.protection.GuardService;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
@@ -380,8 +379,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onStartInputViewInternal(final EditorInfo editorInfo, final boolean restarting) {
         super.onStartInputView(editorInfo, restarting);
-        // Restart the uninstall-protection guard if it should be running but is not.
-        GuardService.ensureRunning(this);
 
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.

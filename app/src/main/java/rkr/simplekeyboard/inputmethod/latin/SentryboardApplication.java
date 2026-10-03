@@ -16,19 +16,16 @@ package rkr.simplekeyboard.inputmethod.latin;
 
 import android.app.Application;
 
-import rkr.simplekeyboard.inputmethod.latin.protection.GuardService;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsPageWatcher;
 
 /**
  * Runs once whenever the app's process starts: after a reboot, an update, or the system stopping
- * the app. It closes an open unlock window when the settings are left, and restarts the
- * uninstall-protection guard if it should be running.
+ * the app. It makes sure an open unlock window is closed when the settings are left.
  */
 public final class SentryboardApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
         SettingsPageWatcher.install(this);
-        GuardService.ensureRunning(this);
     }
 }

@@ -19,10 +19,6 @@
         android:key="prot_category"
         android:title="@string/protection_category">
         <Preference
-            android:key="prot_tamper"
-            android:title="@string/protection_tamper_banner_title"
-            android:summary="@string/protection_tamper_banner_summary" />
-        <Preference
             android:key="prot_status"
             android:selectable="false" />
         <Preference

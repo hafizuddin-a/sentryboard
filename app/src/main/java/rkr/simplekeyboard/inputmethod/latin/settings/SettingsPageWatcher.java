@@ -18,15 +18,12 @@ import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
 
-import rkr.simplekeyboard.inputmethod.latin.protection.GuardService;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsGate;
 
 /**
  * Closes an open unlock window as soon as the user leaves the settings, meaning the whole
  * {@link SettingsActivity} and not one of its sub screens: moving between "Word filter" and
  * "Uninstall protection" is still being on the settings page.
- *
- * It also restarts the uninstall-protection guard whenever the settings screen comes to the front.
  *
  * It is a lifecycle callback rather than code in the activity so that upstream's
  * {@code SettingsActivity} stays untouched. It listens for {@code onPause}, which arrives the
@@ -69,12 +66,6 @@ public final class SettingsPageWatcher implements Application.ActivityLifecycleC
 
     @Override
     public void onActivityResumed(final Activity activity) {
-        if (activity instanceof SettingsActivity) {
-            // The app is on screen, which is when Android lets a foreground service be started from
-            // it. Covers a process that was started in the background (by the keyboard, say),
-            // where Application.onCreate could not start the guard.
-            GuardService.ensureRunning(activity);
-        }
     }
 
     @Override

@@ -19,36 +19,15 @@ import android.content.Context;
 import android.content.Intent;
 
 import rkr.simplekeyboard.inputmethod.R;
-import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsGate;
 
 /**
  * The device admin component. Being an active device admin is what makes Android require
  * deactivation before this app can be uninstalled. It declares no policies, so it cannot lock,
- * wipe or otherwise control the phone.
+ * wipe or otherwise control the phone, and it does nothing but exist.
  */
 public final class ProtectionAdminReceiver extends DeviceAdminReceiver {
     @Override
     public CharSequence onDisableRequested(final Context context, final Intent intent) {
         return context.getString(R.string.protection_disable_message);
-    }
-
-    @Override
-    public void onEnabled(final Context context, final Intent intent) {
-        // Protection is on again, so whatever was reported no longer applies.
-        ProtectionStore.get(context).clearTamper();
-        TamperNotifier.cancel(context);
-        GuardService.ensureRunning(context);
-    }
-
-    @Override
-    public void onDisabled(final Context context, final Intent intent) {
-        try {
-            if (TamperPolicy.isTamper(SettingsGate.getInstance(context).state())) {
-                ProtectionStore.get(context).recordTamper(System.currentTimeMillis());
-                TamperNotifier.post(context);
-            }
-        } catch (RuntimeException e) {
-            // Never let a failure here matter; the app also checks on its own when opened.
-        }
     }
 }
