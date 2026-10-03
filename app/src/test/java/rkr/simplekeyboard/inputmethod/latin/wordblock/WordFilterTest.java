@@ -364,6 +364,192 @@ public class WordFilterTest {
         assertEquals(0, WordFilter.trailingWordLength("a@b "));
     }
 
+    // --- Underscores ---
+
+    @Test
+    public void underscoreIsAWordCharacterThatAlsoEndsTheWordBeforeIt() {
+        assertTrue(WordFilter.isWordCodePoint('_'));
+        assertTrue(WordFilter.endsWord('_'));
+        assertTrue(WordFilter.endsWord(' '));
+        assertTrue(WordFilter.endsWord('.'));
+        assertTrue(WordFilter.endsWord('-'));
+        assertFalse(WordFilter.endsWord('a'));
+        assertFalse(WordFilter.endsWord('7'));
+        assertFalse(WordFilter.endsWord('@'));
+        assertFalse(WordFilter.endsWord('$'));
+        assertFalse(WordFilter.endsWord('\''));
+    }
+
+    @Test
+    public void entriesWithUnderscoresAreAccepted() {
+        assertTrue(WordFilter.isValidEntry("snake_case"));
+        assertTrue(WordFilter.isValidEntry("a_b_c"));
+        assertTrue(WordFilter.isValidEntry("snake_case*"));
+        assertTrue(WordFilter.isValidEntry("snake_case!"));
+        assertTrue(WordFilter.isValidEntry("_word"));
+        assertTrue(WordFilter.isValidEntry("word_"));
+        assertTrue(WordFilter.isValidEntry("don't_stop"));
+        assertTrue(WordFilter.isValidEntry("sn@ke_c4se"));
+    }
+
+    @Test
+    public void anEntryNeedsAtLeastOneLetterOrDigit() {
+        assertFalse(WordFilter.isValidEntry("_"));
+        assertFalse(WordFilter.isValidEntry("___"));
+        assertFalse(WordFilter.isValidEntry("_*"));
+        assertFalse(WordFilter.isValidEntry("_!"));
+        assertFalse(WordFilter.isValidEntry("'_'"));
+        assertTrue(WordFilter.isValidEntry("_1_"));
+    }
+
+    @Test
+    public void otherPunctuationInAnEntryIsStillRejected() {
+        assertFalse(WordFilter.isValidEntry("snake-case"));
+        assertFalse(WordFilter.isValidEntry("snake.case"));
+        assertFalse(WordFilter.isValidEntry("snake case"));
+        assertFalse(WordFilter.isValidEntry("snake_case,"));
+    }
+
+    @Test
+    public void anUnderscoreEntryBlocksThatExactWord() {
+        final WordFilter filter = filterOf("snake_case");
+        assertTrue(filter.isBlocked("snake_case"));
+        assertTrue(filter.isBlocked("Snake_Case"));
+        assertTrue(filter.isBlocked("SN4KE_CASE")); // Leet still applies.
+        assertFalse(filter.isBlocked("snake"));
+        assertFalse(filter.isBlocked("case"));
+        assertFalse(filter.isBlocked("snake_cases"));
+        assertFalse(filter.isBlocked("snakecase"));
+        assertFalse(filter.isBlocked("snake__case"));
+    }
+
+    @Test
+    public void anUnderscoreWildcardMatchesWordsStartingWithTheStem() {
+        final WordFilter filter = filterOf("snake_*");
+        assertTrue(filter.isBlocked("snake_case"));
+        assertTrue(filter.isBlocked("snake_"));
+        assertFalse(filter.isBlocked("snake"));
+        assertFalse(filter.isBlocked("snakes"));
+    }
+
+    @Test
+    public void anUnderscoreInstantEntryIsInstant() {
+        final WordFilter filter = filterOf("snake_case!");
+        assertTrue(filter.isInstant("snake_case"));
+        assertFalse(filter.isInstant("snake_cases"));
+        assertTrue(filter.hasInstantEntries());
+    }
+
+    @Test
+    public void trailingWordLengthCountsUnderscores() {
+        assertEquals(10, WordFilter.trailingWordLength("say snake_case"));
+        assertEquals(2, WordFilter.trailingWordLength("a_"));
+        assertEquals(1, WordFilter.trailingWordLength("hi _"));
+        assertEquals(0, WordFilter.trailingWordLength("snake_case "));
+        assertEquals(3, WordFilter.trailingWordLength("a-b_c-d_e")); // The hyphen still separates.
+    }
+
+    @Test
+    public void edgeUnderscoresDoNotLetABlockedWordThrough() {
+        final WordFilter filter = filterOf("ass");
+        assertTrue(filter.isBlocked("_ass"));
+        assertTrue(filter.isBlocked("ass_"));
+        assertTrue(filter.isBlocked("__ass__"));
+        assertTrue(filter.isBlocked("_@ass$_"));
+        assertFalse(filter.isBlocked("_"));
+        assertFalse(filter.isBlocked("__"));
+        assertFalse(filter.isBlocked("cl_ass"));
+    }
+
+    // --- blockedLength / instantLength ---
+
+    @Test
+    public void blockedLengthOfAPlainWordIsItsWholeLength() {
+        final WordFilter filter = filterOf("word");
+        assertEquals(4, filter.blockedLength("word"));
+        assertEquals(4, filter.blockedLength("WORD"));
+        assertEquals(0, filter.blockedLength("words"));
+        assertEquals(0, filter.blockedLength(""));
+        assertEquals(0, filter.blockedLength(null));
+    }
+
+    @Test
+    public void blockedLengthFindsABlockedWordAfterAnUnderscore() {
+        // Only the blocked ending is deleted; what comes before the underscore stays.
+        final WordFilter filter = filterOf("word");
+        assertEquals(4, filter.blockedLength("my_word"));
+        assertEquals(4, filter.blockedLength("a_b_word"));
+        assertEquals(0, filter.blockedLength("my_words"));
+        assertEquals(0, filter.blockedLength("sword_x"));
+    }
+
+    @Test
+    public void blockedLengthDoesNotLookInTheMiddleOfARun() {
+        // A word followed by more underscore-joined text was already caught when the underscore
+        // after it was typed, so only the ending of the run matters.
+        assertEquals(0, filterOf("word").blockedLength("word_list"));
+    }
+
+    @Test
+    public void blockedLengthPrefersTheLongestMatch() {
+        final WordFilter both = filterOf("word", "my_word");
+        assertEquals(7, both.blockedLength("my_word"));
+        assertEquals(4, both.blockedLength("your_word"));
+        assertEquals(9, filterOf("word", "your_word").blockedLength("your_word"));
+    }
+
+    @Test
+    public void blockedLengthFindsAnUnderscoreEntryAfterAnotherUnderscore() {
+        final WordFilter filter = filterOf("snake_case");
+        assertEquals(10, filter.blockedLength("snake_case"));
+        assertEquals(10, filter.blockedLength("my_snake_case"));
+        assertEquals(0, filter.blockedLength("snake"));
+        assertEquals(0, filter.blockedLength("snake_cases"));
+    }
+
+    @Test
+    public void blockedLengthWithEdgeSymbolsCoversTheWholeRun() {
+        final WordFilter filter = filterOf("word");
+        assertEquals(5, filter.blockedLength("_word"));
+        assertEquals(5, filter.blockedLength("word_"));
+        assertEquals(8, filter.blockedLength("__word__"));
+        assertEquals(5, filter.blockedLength("@word"));
+        assertEquals(5, filter.blockedLength("my_@word")); // "my_" stays.
+    }
+
+    @Test
+    public void blockedLengthWithAWildcardDeletesTheMatchingEnding() {
+        final WordFilter filter = filterOf("word*");
+        assertEquals(7, filter.blockedLength("my_wording"));
+        assertEquals(0, filter.blockedLength("my_sword"));
+        assertEquals(10, filterOf("snake_*").blockedLength("snake_case"));
+    }
+
+    @Test
+    public void blockedLengthCountsSupplementaryCharactersInUtf16Units() {
+        // U+10428 is a letter outside the BMP: 2 UTF-16 units.
+        final String letter = new String(Character.toChars(0x10428));
+        final WordFilter filter = filterOf("a" + letter);
+        assertEquals(3, filter.blockedLength("a" + letter));
+        assertEquals(3, filter.blockedLength("x_a" + letter));
+    }
+
+    @Test
+    public void instantLengthFindsTheInstantEndingOnly() {
+        final WordFilter filter = filterOf("xyz!", "plain");
+        assertEquals(3, filter.instantLength("xyz"));
+        assertEquals(3, filter.instantLength("my_xyz"));
+        assertEquals(0, filter.instantLength("plain"));      // Blocked, but not instant.
+        assertEquals(0, filter.instantLength("xyzz"));
+        assertEquals(0, filter.instantLength(""));
+        assertEquals(0, filterOf("word").instantLength("word"));
+    }
+
+    @Test
+    public void blockedLengthOnAnEmptyFilterIsZero() {
+        assertEquals(0, new WordFilter(Collections.<String>emptyList()).blockedLength("anything_at_all"));
+    }
+
     // --- trailingWordLength ---
 
     @Test

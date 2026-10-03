@@ -39,8 +39,13 @@ One entry per line in *Settings > Word filter*:
 | `word*` | Also blocks longer words that start with `word` (`words`, `wording`, but not `sword`). |
 | `word!` | Blocks exactly that word **and removes it the instant it is typed**, without waiting for a separator. Use it only for words that are not the start of harmless words: with `ass!`, typing `assess` deletes `ass` as soon as its third letter is typed. |
 
-An entry must be a single word of letters, digits, apostrophes, `@` and `$`, optionally ending in `*` or `!`.
-Anything else (spaces, hyphens, other punctuation) could never match a typed word and is rejected.
+An entry must be a single word of letters, digits, apostrophes, underscores, `@` and `$`, optionally ending
+in `*` or `!`, with at least one letter or digit. Anything else (spaces, hyphens, other punctuation) could
+never match a typed word and is rejected.
+
+Underscores are part of a word, so `snake_case` can be an entry and is matched as one word. They also
+mark a checkpoint: a blocked word right before an underscore (`word` in `word_list`) is still removed
+when you type the underscore, and only that word goes, so `my_word` becomes `my_`.
 
 ### Settings
 

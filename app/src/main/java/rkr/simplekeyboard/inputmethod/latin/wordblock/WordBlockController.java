@@ -74,7 +74,7 @@ public final class WordBlockController {
      */
     public boolean beforeSeparator(final SettingsValues settingsValues, final EditorInfo editorInfo,
             final int codePoint) {
-        if (codePoint < 0 || WordFilter.isWordCodePoint(codePoint)) {
+        if (codePoint < 0 || !WordFilter.endsWord(codePoint)) {
             return false; // Still inside a word.
         }
         return removeBlockedWord(settingsValues, editorInfo);
@@ -105,11 +105,12 @@ public final class WordBlockController {
             }
             final int window = windowFor(filter);
             // Some editors (terminals, custom views) return null. Then there is nothing to check.
-            final CharSequence word = trailingWord(mConnection.getTextBeforeCursor(window), window);
-            if (word == null || !filter.isBlocked(word)) {
+            final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
+            final int length = run == null ? 0 : filter.blockedLength(run);
+            if (length == 0) {
                 return false;
             }
-            return deleteInBatch(word.length());
+            return deleteInBatch(length);
         } catch (RuntimeException e) {
             logFailure(e);
             return false;
@@ -143,14 +144,15 @@ public final class WordBlockController {
                 return;
             }
             final int window = windowFor(filter);
-            final CharSequence cachedWord =
+            final CharSequence cachedRun =
                     trailingWord(mConnection.getCachedTextBeforeCursor(window), window);
-            if (cachedWord == null || !filter.isInstant(cachedWord)) {
+            if (cachedRun == null || filter.instantLength(cachedRun) == 0) {
                 return;
             }
-            final CharSequence word = trailingWord(mConnection.getTextBeforeCursor(window), window);
-            if (word != null && filter.isInstant(word)) {
-                deleteNow(word.length());
+            final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
+            final int length = run == null ? 0 : filter.instantLength(run);
+            if (length > 0) {
+                deleteNow(length);
             }
         } catch (RuntimeException e) {
             logFailure(e);
@@ -191,9 +193,10 @@ public final class WordBlockController {
             }
             final WordFilter filter = getStore().getFilter();
             final int window = windowFor(filter);
-            final CharSequence word = trailingWord(mConnection.getTextBeforeCursor(window), window);
-            if (word != null && filter.isBlocked(word)) {
-                deleteNow(word.length());
+            final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
+            final int length = run == null ? 0 : filter.blockedLength(run);
+            if (length > 0) {
+                deleteNow(length);
             }
         } catch (RuntimeException e) {
             logFailure(e);
@@ -213,8 +216,8 @@ public final class WordBlockController {
     }
 
     /**
-     * @return the run of word characters at the end of {@code text}, or null if there is none or
-     * it may have been cut off by the edge of the window.
+     * @return the run of word characters at the end of {@code text} (an underscore counts as one),
+     * or null if there is none or it may have been cut off by the edge of the window.
      */
     private static CharSequence trailingWord(final CharSequence text, final int window) {
         if (text == null) {

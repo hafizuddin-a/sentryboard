@@ -39,7 +39,8 @@ import java.util.regex.Pattern;
  *     as soon as it has been typed instead of waiting for a separator.</li>
  * </ul>
  * Entries that cannot ever match a single typed word (blank, or containing anything other than
- * letters, digits and apostrophes once the marker is removed) are ignored.
+ * letters, digits, apostrophes, underscores, {@code @} and {@code $} once the marker is removed, or
+ * having no letter or digit at all) are ignored.
  *
  * <h3>Normalization</h3>
  * Typed words and list entries go through the same pipeline: NFKD with combining marks removed,
@@ -142,21 +143,76 @@ public final class WordFilter {
     }
 
     /**
+     * Finds the blocked word at the end of a run of word characters, as read back from the editor.
+     *
+     * A run that contains underscores, such as {@code my_word_list}, is looked at from each of its
+     * underscore-bounded endings in turn (the whole run, then {@code word_list}, then
+     * {@code list}), longest first, so that both {@code snake_case} as a single entry and a plain
+     * {@code word} after an underscore are found. Only the matching ending is meant to be deleted,
+     * so what comes before the underscore stays, as it did before underscores were word characters.
+     *
+     * @param run the run of word characters ending at the cursor.
+     * @return how many UTF-16 units at the end of the run are a blocked word, or 0 if none.
+     */
+    public int blockedLength(final CharSequence run) {
+        if (isEmpty() || run == null || run.length() == 0) {
+            return 0;
+        }
+        for (final int start : endingStarts(run)) {
+            if (isBlocked(start == 0 ? run : run.subSequence(start, run.length()))) {
+                return run.length() - start;
+            }
+        }
+        return 0;
+    }
+
+    /** Like {@link #blockedLength}, for entries marked with {@code !}. */
+    public int instantLength(final CharSequence run) {
+        if (mInstantWords.isEmpty() || run == null || run.length() == 0) {
+            return 0;
+        }
+        for (final int start : endingStarts(run)) {
+            if (isInstant(start == 0 ? run : run.subSequence(start, run.length()))) {
+                return run.length() - start;
+            }
+        }
+        return 0;
+    }
+
+    /** The positions where an underscore-bounded ending of the run starts, longest ending first. */
+    private static int[] endingStarts(final CharSequence run) {
+        int count = 1;
+        for (int i = 0; i < run.length() - 1; i++) {
+            if (run.charAt(i) == '_') {
+                count++;
+            }
+        }
+        final int[] starts = new int[count];
+        int next = 1; // starts[0] is 0, the whole run.
+        for (int i = 0; i < run.length() - 1; i++) {
+            if (run.charAt(i) == '_') {
+                starts[next++] = i + 1;
+            }
+        }
+        return starts;
+    }
+
+    /**
      * The readings of a typed word that are worth comparing: the word itself and, if it starts or
-     * ends with {@code @} or {@code $}, the word without those edge symbols. Inside a word they
-     * stand for letters ({@code sh@t}), but at an edge they are far more likely to be a mention,
-     * a price or other punctuation ({@code @word}, {@code word$}), and must not let a blocked word
-     * through.
+     * ends with {@code @}, {@code $} or {@code _}, the word without those edge symbols. Inside a
+     * word {@code @} and {@code $} stand for letters ({@code sh@t}), but at an edge all three are
+     * far more likely to be a mention, a price or other punctuation ({@code @word}, {@code word$},
+     * {@code _word_}), and must not let a blocked word through.
      */
     private static List<CharSequence> candidates(final CharSequence word) {
         final List<CharSequence> result = new ArrayList<>(4);
         result.add(word);
         int start = 0;
         int end = word.length();
-        while (start < end && isLeetSymbol(word.charAt(start))) {
+        while (start < end && isEdgeSymbol(word.charAt(start))) {
             start++;
         }
-        while (end > start && isLeetSymbol(word.charAt(end - 1))) {
+        while (end > start && isEdgeSymbol(word.charAt(end - 1))) {
             end--;
         }
         if (start == end) {
@@ -188,17 +244,32 @@ public final class WordFilter {
     }
 
     /**
-     * Word characters are letters, digits, apostrophes and the leet symbols {@code @} and
-     * {@code $}, so that a disguised word such as {@code w@rd} or {@code sh$t} is one word.
-     * Everything else separates words.
+     * Word characters are letters, digits, apostrophes, underscores and the leet symbols {@code @}
+     * and {@code $}, so that {@code snake_case} is one word and a disguised word such as
+     * {@code w@rd} or {@code sh$t} is one word. Everything else separates words.
      */
     public static boolean isWordCodePoint(final int codePoint) {
         return Character.isLetterOrDigit(codePoint) || codePoint == '\'' || codePoint == '\u2019'
-                || isLeetSymbol(codePoint);
+                || codePoint == '_' || isLeetSymbol(codePoint);
+    }
+
+    /**
+     * @return true if typing this character completes the word before it, so that word should be
+     * checked. That is every non-word character, and also the underscore: it is part of a word
+     * (see {@link #isWordCodePoint}), but a blocked word in front of it, as in {@code word_list},
+     * is still caught when the underscore is typed.
+     */
+    public static boolean endsWord(final int codePoint) {
+        return !isWordCodePoint(codePoint) || codePoint == '_';
     }
 
     private static boolean isLeetSymbol(final int codePoint) {
         return codePoint == '@' || codePoint == '$';
+    }
+
+    /** Symbols that, at the edge of a word, are punctuation rather than part of it. */
+    private static boolean isEdgeSymbol(final int codePoint) {
+        return isLeetSymbol(codePoint) || codePoint == '_';
     }
 
     /**
@@ -326,25 +397,30 @@ public final class WordFilter {
                 return null;
             }
             // Normalization only changes letters into other letters and drops apostrophes, so any
-            // other character left over means the entry could never match a typed word.
+            // character left over that is not a letter, digit or underscore means the entry could
+            // never match a typed word. At least one letter or digit is needed: an entry made of
+            // underscores alone would match every run that happens to contain one.
             final Set<String> variants = variantsOf(body);
             for (final String variant : variants) {
-                if (variant.isEmpty() || !consistsOfLettersAndDigits(variant)) {
+                if (!isUsableBody(variant)) {
                     return null;
                 }
             }
             return new Entry(body, wildcard, instant);
         }
 
-        private static boolean consistsOfLettersAndDigits(final String s) {
+        private static boolean isUsableBody(final String s) {
+            boolean hasLetterOrDigit = false;
             for (int i = 0; i < s.length(); ) {
                 final int codePoint = s.codePointAt(i);
-                if (!Character.isLetterOrDigit(codePoint)) {
+                if (Character.isLetterOrDigit(codePoint)) {
+                    hasLetterOrDigit = true;
+                } else if (codePoint != '_') {
                     return false;
                 }
                 i += Character.charCount(codePoint);
             }
-            return true;
+            return hasLetterOrDigit;
         }
     }
 }

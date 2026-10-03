@@ -136,7 +136,7 @@
     <string name="wordblock_add_confirm" translatable="false">Add</string>
     <string name="wordblock_remove_title" translatable="false">Remove from list?</string>
     <string name="wordblock_remove_confirm" translatable="false">Remove</string>
-    <string name="wordblock_invalid" translatable="false">Use one word made of letters, digits and apostrophes, optionally ending in * or !</string>
+    <string name="wordblock_invalid" translatable="false">Use one word made of letters, digits, apostrophes and underscores, optionally ending in * or !</string>
     <string name="wordblock_duplicate" translatable="false">That word is already on the list</string>
     <string name="wordblock_save_failed" translatable="false">Could not save the list</string>
 </resources>
