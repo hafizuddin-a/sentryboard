@@ -28,9 +28,9 @@
     <!-- Settings lock -->
     <string name="wordblock_lock_category" translatable="false">Settings lock</string>
     <string name="wordblock_lock_status_off" translatable="false">Settings lock is off</string>
-    <string name="wordblock_lock_status_off_summary" translatable="false">Anyone holding this phone can change the word filter. Lock it so that changing it takes a countdown.</string>
+    <string name="wordblock_lock_status_off_summary" translatable="false">Anyone holding this phone can change the word filter. Lock it so that removing words and changing settings takes a countdown. Adding words stays allowed.</string>
     <string name="wordblock_lock_status_locked" translatable="false">Settings are locked</string>
-    <string name="wordblock_lock_status_locked_summary" translatable="false">The word filter can be viewed but not changed. To change it, tap Unlock and stay on the unlock page for %1$s.</string>
+    <string name="wordblock_lock_status_locked_summary" translatable="false">You can still add words, but not remove them or change anything else. To do that, tap Unlock and stay on the unlock page for %1$s.</string>
     <string name="wordblock_lock_status_unlocked" translatable="false">Unlocked for editing</string>
     <string name="wordblock_lock_status_unlocked_summary" translatable="false">Locks again when you leave this screen, or in %1$s.</string>
     <string name="wordblock_lock_lock" translatable="false">Lock settings</string>

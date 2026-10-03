@@ -62,9 +62,10 @@ phone and date fields, and fields that declare no input type are never touched.
 ## Settings lock
 
 Under *Settings > Word filter > Settings lock* you can lock the filter's settings for a chosen
-duration. While locked, you can still **view** the blocked-word list, but you cannot change the
-on/off switch, add or remove entries, change the pause options, or change or remove the lock itself.
-Keyboard settings such as theme and height are not affected.
+duration. While locked you can still **view** the blocked-word list and **add** words to it: adding can
+only make the filter stronger. What is locked is **removing** words, the on/off switch, the pause
+options, and the lock itself (its length, and removing it). Keyboard settings such as theme and height
+are not affected.
 
 To edit again, tap **Unlock**. A full-screen page counts down the length you chose; you must stay on
 it until it finishes. Then the settings are editable until you leave the settings, or for 5 minutes,
@@ -76,8 +77,8 @@ or until the phone restarts, whichever comes first.
 - The countdown is never saved. If the app is killed mid-countdown the lock simply stays on.
 - The lock's length is fixed while it is on. It can be changed only while the settings are unlocked,
   and applies the next time you lock.
-- The lock is enforced in the screens **and** underneath them: the word list and the filter settings
-  refuse to be written while locked, whatever a screen does. If the saved lock state ever looks
+- The lock is enforced in the screens **and** underneath them: removing from the word list and changing
+  the filter settings are refused while locked, whatever a screen does. If the saved lock state ever looks
   corrupt, the lock is treated as **on** (with a 30 minute countdown).
 - Lengths from 1 minute to 24 hours (test builds also allow a few seconds, so the lock can be tried
   without waiting).

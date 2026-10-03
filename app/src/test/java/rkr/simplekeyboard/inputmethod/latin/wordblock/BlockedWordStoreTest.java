@@ -144,15 +144,45 @@ public class BlockedWordStoreTest {
     }
 
     @Test
-    public void refusesToAddWhileLocked() {
+    public void canStillAddWhileLocked() throws IOException {
         final boolean[] locked = {true};
         final BlockedWordStore store = new BlockedWordStore(file(), () -> !locked[0]);
+        assertTrue(store.add("word"));
+        assertTrue(store.add("other*"));
+        assertEquals(Arrays.asList("word", "other*"), store.getEntries());
+        assertTrue(store.getFilter().isBlocked("word"));
+        assertEquals("word\nother*\n", new String(Files.readAllBytes(file().toPath()), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void addingWhileLockedStillRejectsBadAndDuplicateEntries() {
+        final BlockedWordStore store = new BlockedWordStore(file(), () -> false);
+        assertTrue(store.add("word"));
         assertFalse(store.add("word"));
-        assertTrue(store.getEntries().isEmpty());
-        assertFalse(file().exists());
+        assertFalse(store.add("two words"));
+        assertFalse(store.add(""));
+        assertEquals(Collections.singletonList("word"), store.getEntries());
+    }
+
+    @Test
+    public void anEntryAddedWhileLockedCannotBeRemovedWhileLocked() {
+        final boolean[] locked = {true};
+        final BlockedWordStore store = new BlockedWordStore(file(), () -> !locked[0]);
+        assertTrue(store.add("word"));
+        assertFalse(store.remove("word"));
+        assertTrue(store.getFilter().isBlocked("word"));
 
         locked[0] = false;
-        assertTrue(store.add("word"));
+        assertTrue(store.remove("word"));
+    }
+
+    @Test
+    public void underscoreEntriesAreAccepted() {
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
+        assertTrue(store.add("snake_case"));
+        assertTrue(store.getFilter().isBlocked("snake_case"));
+        assertEquals(Collections.singletonList("snake_case"), new BlockedWordStore(file(), OPEN).getEntries());
+        assertFalse(store.add("___"));
     }
 
     @Test

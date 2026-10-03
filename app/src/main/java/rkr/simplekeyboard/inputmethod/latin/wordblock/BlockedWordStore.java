@@ -63,7 +63,7 @@ public final class BlockedWordStore {
 
     /**
      * Creates a store backed by {@code file} and loads it. A missing or unreadable file is empty.
-     * Changes are refused while {@code gate} says the settings are locked.
+     * Removing entries is refused while {@code gate} says the settings are locked; adding is not.
      */
     public BlockedWordStore(final File file, final WriteGate gate) {
         mFile = file;
@@ -92,15 +92,13 @@ public final class BlockedWordStore {
     }
 
     /**
-     * Adds an entry.
+     * Adds an entry. This is allowed even while the settings are locked: the lock exists to stop
+     * the list being weakened, and adding a word can only make it stronger. (Removing is gated.)
      *
-     * @return true if it was added; false if the settings are locked, it is not a usable entry, it
-     * is already in the list, or it could not be saved (in which case the list is unchanged).
+     * @return true if it was added; false if it is not a usable entry, it is already in the list,
+     * or it could not be saved (in which case the list is unchanged).
      */
     public synchronized boolean add(final String rawEntry) {
-        if (!mGate.canModifyFilterSettings()) {
-            return false;
-        }
         final String entry = clean(rawEntry);
         if (entry == null || indexOf(mEntries, entry) >= 0) {
             return false;

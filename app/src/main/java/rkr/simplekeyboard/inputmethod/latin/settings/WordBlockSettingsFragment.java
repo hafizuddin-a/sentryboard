@@ -51,7 +51,8 @@ import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsLock;
  * What is editable follows {@link SettingsGate#canModifyFilterSettings()}, which is re-read every
  * time the screen is shown and again before each change. That is only the first layer: the data
  * layer ({@link BlockedWordStore}, {@link FilterSettingsWriter}) refuses changes while locked
- * whatever this screen does. While locked the blocked-word list can still be viewed.
+ * whatever this screen does. While locked the blocked-word list can still be viewed, and words can
+ * still be added to it; removing a word, and every other setting, is what is locked.
  */
 public final class WordBlockSettingsFragment extends SubScreenFragment {
     private static final String KEY_LOCK_CATEGORY = "lock_category";
@@ -156,7 +157,8 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         mEnabled.setEnabled(editable);
         mIdleEnabled.setEnabled(editable);
         mIdleDelay.setEnabled(editable);
-        findPreference(KEY_ADD).setEnabled(editable);
+        // Adding a word is always allowed, even while locked; only removing is not.
+        findPreference(KEY_ADD).setEnabled(true);
 
         refreshLockSection(state);
         refreshList(editable);
@@ -341,10 +343,6 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     }
 
     private void showAddDialog() {
-        if (!mGate.canModifyFilterSettings()) {
-            refresh();
-            return;
-        }
         final Context context = getActivity();
         final EditText input = new EditText(context);
         input.setHint(R.string.wordblock_add_hint);
@@ -379,9 +377,7 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         if (entry.isEmpty()) {
             return;
         }
-        if (!mGate.canModifyFilterSettings()) {
-            toast(R.string.wordblock_lock_status_locked);
-        } else if (!WordFilter.isValidEntry(entry)) {
+        if (!WordFilter.isValidEntry(entry)) {
             toast(R.string.wordblock_invalid);
         } else if (!mStore.add(entry)) {
             toast(alreadyListed(entry) ? R.string.wordblock_duplicate
