@@ -27,7 +27,7 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 /**
  * Removes a blocked word from the editor.
  *
- * There are three ways a word can be removed:
+ * There are four ways a word can be removed:
  * <ul>
  * <li>When the user completes it: {@code InputLogic} calls {@link #beforeSeparator} (or
  *     {@link #beforeEditorAction}) just before it commits a separator or performs an editor
@@ -36,6 +36,8 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
  *     {@link #afterWordCharacter}. This closes the gap where the user taps the app's own Send
  *     button without typing a separator.</li>
  * <li>After a pause in typing, if that optional setting is on: {@link #scheduleIdleRemoval}.</li>
+ * <li>When the user edits a word that already has text after the cursor, which the three ways
+ *     above never look at: {@link #afterEdit} checks the whole word around the cursor.</li>
  * </ul>
  *
  * Nothing here may ever break typing: every entry point catches {@link RuntimeException}, logs
@@ -48,11 +50,14 @@ public final class WordBlockController {
     private static final String TAG = "WordBlock";
     private static final int MIN_WINDOW = 32;
     private static final int WINDOW_MARGIN = 8;
+    // Long enough for a digit, which reaches the editor as an asynchronous key event, to arrive.
+    private static final long SETTLE_MILLIS = 150;
 
     private final LatinIME mLatinIme;
     private final RichInputConnection mConnection;
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final Runnable mIdleRemoval = this::removeAfterIdle;
+    private final Runnable mSettledCheck = this::removeAroundCursorAfterSettling;
     // Resolved on first use: this object is created while the service is still being constructed
     // and has no base context yet.
     private BlockedWordStore mStore;
@@ -149,6 +154,13 @@ public final class WordBlockController {
             if (cachedRun == null || filter.instantLength(cachedRun) == 0) {
                 return;
             }
+            // Typing inside a word that goes on after the cursor: the whole word is judged by
+            // afterEdit, not the part of it typed so far.
+            final CharSequence cachedAfter = mConnection.getCachedTextAfterCursor(2);
+            if (cachedAfter.length() > 0
+                    && WordFilter.isWordCodePoint(Character.codePointAt(cachedAfter, 0))) {
+                return;
+            }
             final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
             final int length = run == null ? 0 : filter.instantLength(run);
             if (length > 0) {
@@ -159,11 +171,99 @@ public final class WordBlockController {
         }
     }
 
+    // ---- After editing a word that has text after the cursor ----------------------------------
+
+    /**
+     * To be called after every keystroke has been handled. If there is text after the cursor, the
+     * word around the cursor is a finished one that is being edited, which is how a blocked word
+     * can be slipped past the other checks: type {@code helo} and a space, then go back and add
+     * the {@code l}. So the whole word, the part before the cursor and the part after it, is read
+     * back and deleted if it is blocked. This covers inserting, deleting and splitting a word.
+     *
+     * With nothing after the cursor, which is nearly all typing, this costs one local string
+     * check. The same check runs again a moment later (see {@link #SETTLE_MILLIS}) in case the
+     * editor had not yet applied the keystroke.
+     */
+    public void afterEdit(final SettingsValues settingsValues, final EditorInfo editorInfo) {
+        try {
+            final WordFilter filter = filterToCheckAroundCursor(settingsValues, editorInfo);
+            if (filter == null) {
+                return;
+            }
+            removeAroundCursor(filter);
+            mHandler.removeCallbacks(mSettledCheck);
+            mHandler.postDelayed(mSettledCheck, SETTLE_MILLIS);
+        } catch (RuntimeException e) {
+            logFailure(e);
+        }
+    }
+
+    private void removeAroundCursorAfterSettling() {
+        try {
+            final WordFilter filter = filterToCheckAroundCursor(Settings.getInstance().getCurrent(),
+                    mLatinIme.getCurrentInputEditorInfo());
+            if (filter != null) {
+                removeAroundCursor(filter);
+            }
+        } catch (RuntimeException e) {
+            logFailure(e);
+        }
+    }
+
+    /** @return the filter, if a word around the cursor is worth checking now, else null. */
+    private WordFilter filterToCheckAroundCursor(final SettingsValues settingsValues,
+            final EditorInfo editorInfo) {
+        if (!isActive(settingsValues, editorInfo) || mConnection.hasSelection()) {
+            return null;
+        }
+        final WordFilter filter = getStore().getFilter();
+        if (filter.isEmpty()) {
+            return null;
+        }
+        // Nothing after the cursor means the user is typing at the end of the text. That word is
+        // not finished: separators, instant entries and the pause setting deal with it.
+        return mConnection.getCachedTextAfterCursor(1).length() == 0 ? null : filter;
+    }
+
+    private void removeAroundCursor(final WordFilter filter) {
+        final int window = windowFor(filter);
+        final CharSequence before = mConnection.getTextBeforeCursor(window);
+        final CharSequence after = mConnection.getTextAfterCursor(window);
+        if (before == null || after == null || after.length() == 0) {
+            return;
+        }
+        final int beforeLength = WordFilter.trailingWordLength(before);
+        final int afterLength = WordFilter.leadingWordLength(after);
+        // A run that fills the window may go on beyond it: do not judge a word by a piece of it.
+        if ((beforeLength == before.length() && before.length() >= window)
+                || (afterLength == after.length() && after.length() >= window)) {
+            return;
+        }
+        final WordFilter.Hit hit = filter.blockedAround(
+                before.subSequence(before.length() - beforeLength, before.length()),
+                after.subSequence(0, afterLength));
+        if (hit == null) {
+            return;
+        }
+        mConnection.beginBatchEdit();
+        try {
+            if (hit.after > 0) {
+                mConnection.deleteTextAfterCursor(hit.after);
+            }
+            if (hit.before > 0) {
+                mConnection.deleteTextBeforeCursor(hit.before);
+            }
+        } finally {
+            endBatch();
+        }
+    }
+
     // ---- After a pause in typing (optional) ---------------------------------------------------
 
     /** To be called at the start of every keystroke: the user is not idle any more. */
     public void cancelIdleRemoval() {
         mHandler.removeCallbacks(mIdleRemoval);
+        mHandler.removeCallbacks(mSettledCheck);
     }
 
     /**

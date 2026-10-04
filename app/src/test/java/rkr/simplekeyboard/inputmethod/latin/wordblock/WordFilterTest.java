@@ -2,6 +2,7 @@ package rkr.simplekeyboard.inputmethod.latin.wordblock;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -629,5 +630,131 @@ public class WordFilterTest {
         final int length = WordFilter.trailingWordLength(text);
         assertEquals(4, length);
         assertEquals("s\u00f3rd", text.substring(text.length() - length));
+    }
+
+    // --- leadingWordLength ---
+
+    @Test
+    public void leadingWordLengthStopsAtTheFirstSeparator() {
+        assertEquals(5, WordFilter.leadingWordLength("hello world"));
+        assertEquals(5, WordFilter.leadingWordLength("hello"));
+        assertEquals(0, WordFilter.leadingWordLength(" hello"));
+        assertEquals(0, WordFilter.leadingWordLength(""));
+        assertEquals(0, WordFilter.leadingWordLength(null));
+    }
+
+    @Test
+    public void leadingWordLengthCountsTheSameCharactersAsTrailingWordLength() {
+        assertEquals(11, WordFilter.leadingWordLength("don't_sh@t$ x"));
+        assertEquals(3, WordFilter.leadingWordLength("a_b-c"));
+        final String letter = new String(Character.toChars(0x10428));
+        assertEquals(4, WordFilter.leadingWordLength(letter + letter + "."));
+    }
+
+    // --- blockedAround ---
+
+    private static void assertHit(final int before, final int after, final WordFilter.Hit hit) {
+        assertTrue("expected a hit", hit != null);
+        assertEquals(before, hit.before);
+        assertEquals(after, hit.after);
+    }
+
+    @Test
+    public void blockedAroundFindsAWordCompletedInTheMiddle() {
+        final WordFilter filter = filterOf("hello");
+        assertHit(4, 1, filter.blockedAround("hell", "o"));
+        assertHit(3, 2, filter.blockedAround("hel", "lo"));
+        assertHit(1, 4, filter.blockedAround("h", "ello"));
+        assertHit(0, 5, filter.blockedAround("", "hello"));
+        assertHit(5, 0, filter.blockedAround("hello", ""));
+    }
+
+    @Test
+    public void blockedAroundLeavesWordsThatAreNotBlocked() {
+        final WordFilter filter = filterOf("hello");
+        assertNull(filter.blockedAround("helo", ""));
+        assertNull(filter.blockedAround("hel", "o"));
+        assertNull(filter.blockedAround("hell", "ox"));
+        assertNull(filter.blockedAround("sh", "ello"));
+        assertNull(filter.blockedAround("", ""));
+        assertNull(filter.blockedAround(null, "hello"));
+        assertNull(filter.blockedAround("hello", null));
+        assertNull(filterOf().blockedAround("hello", ""));
+    }
+
+    @Test
+    public void blockedAroundKeepsWholeWordMatchingForShortEntries() {
+        final WordFilter filter = filterOf("ass");
+        assertNull(filter.blockedAround("cl", "ass"));
+        assertNull(filter.blockedAround("ass", "ignment"));
+        assertNull(filter.blockedAround("a", "ssess"));
+        assertHit(1, 2, filter.blockedAround("a", "ss"));
+    }
+
+    @Test
+    public void blockedAroundHonoursWildcardsAndDisguises() {
+        assertHit(3, 4, filterOf("hello*").blockedAround("hel", "lo's"));
+        assertHit(3, 2, filterOf("hello").blockedAround("he1", "1o"));
+        assertHit(2, 4, filterOf("hello").blockedAround("@h", "ello"));
+        assertHit(3, 2, filterOf("word").blockedAround("@wo", "rd"));
+        assertHit(2, 3, filterOf("shat").blockedAround("sh", "@t$"));
+    }
+
+    @Test
+    public void blockedAroundOnlyDeletesTheUnderscoreBoundedWordAtTheCursor() {
+        final WordFilter filter = filterOf("hello");
+        assertHit(3, 2, filter.blockedAround("my_hel", "lo_you"));
+        assertHit(3, 2, filter.blockedAround("my_hel", "lo"));
+        assertHit(3, 2, filter.blockedAround("hel", "lo_you"));
+        // A blocked word elsewhere in the run was not edited and is left alone.
+        assertNull(filter.blockedAround("hello_wor", "ld"));
+        assertNull(filter.blockedAround("hello_", "world"));
+    }
+
+    @Test
+    public void blockedAroundTouchingAnUnderscoreStillCountsAsTheCursorWord() {
+        final WordFilter filter = filterOf("hello");
+        assertHit(5, 0, filter.blockedAround("hello", "_world"));
+        assertHit(0, 5, filter.blockedAround("world_", "hello"));
+    }
+
+    @Test
+    public void blockedAroundPrefersTheWidestBlockedStretch() {
+        final WordFilter filter = filterOf("hello", "hello_world");
+        assertHit(3, 8, filter.blockedAround("hel", "lo_world"));
+        assertHit(8, 3, filter.blockedAround("hello_wo", "rld"));
+    }
+
+    @Test
+    public void blockedAroundFindsEntriesThatContainUnderscores() {
+        final WordFilter filter = filterOf("snake_case");
+        assertHit(7, 3, filter.blockedAround("snake_c", "ase"));
+        assertHit(2, 8, filter.blockedAround("sn", "ake_case"));
+        assertNull(filter.blockedAround("snake_c", "asey"));
+    }
+
+    @Test
+    public void blockedAroundWithNothingAfterTheCursorMatchesBlockedLength() {
+        final WordFilter filter = filterOf("word", "snake_case", "hello*");
+        final String[] runs = {"word", "my_word", "a_b_word", "snake_case", "my_snake_case",
+                "hello", "helloes", "words", "sword", "@word", "word$", "_word_", "w0rd", "x"};
+        for (final String run : runs) {
+            final WordFilter.Hit hit = filter.blockedAround(run, "");
+            final int length = filter.blockedLength(run);
+            if (length == 0) {
+                assertNull(run, hit);
+            } else {
+                assertHit(length, 0, hit);
+            }
+        }
+    }
+
+    @Test
+    public void blockedAroundCopesWithLongUnderscoreRuns() {
+        final StringBuilder many = new StringBuilder();
+        for (int i = 0; i < 40; i++) {
+            many.append("a_");
+        }
+        assertNull(filterOf("hello").blockedAround(many.toString(), many.toString()));
     }
 }

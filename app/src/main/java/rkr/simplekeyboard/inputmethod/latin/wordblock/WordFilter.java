@@ -179,6 +179,74 @@ public final class WordFilter {
         return 0;
     }
 
+    /** A blocked word found around the cursor: how many UTF-16 units to delete on each side of it. */
+    public static final class Hit {
+        public final int before;
+        public final int after;
+
+        Hit(final int before, final int after) {
+            this.before = before;
+            this.after = after;
+        }
+    }
+
+    /**
+     * Finds a blocked word that contains or touches the cursor, for text that was edited inside or
+     * right next to a word that already had something after it. {@link #blockedLength} only sees
+     * the end of a word, so it cannot tell that typing the {@code l} of {@code hel|o} has just made
+     * {@code hello}.
+     *
+     * The run is the word characters before the cursor followed by the word characters after it. As
+     * in {@link #blockedLength}, an underscore-bounded stretch of the run is tried as a word of its
+     * own, but only one that reaches the cursor, so that a blocked word elsewhere in the run is
+     * left as it was. The widest blocked stretch wins.
+     *
+     * @param beforeRun the run of word characters that ends at the cursor (may be empty).
+     * @param afterRun the run of word characters that starts at the cursor (may be empty).
+     * @return what to delete, or null if nothing around the cursor is blocked.
+     */
+    public Hit blockedAround(final CharSequence beforeRun, final CharSequence afterRun) {
+        if (isEmpty() || beforeRun == null || afterRun == null) {
+            return null;
+        }
+        final int cursor = beforeRun.length();
+        final String run = new StringBuilder(cursor + afterRun.length())
+                .append(beforeRun).append(afterRun).toString();
+        final int length = run.length();
+        if (length == 0) {
+            return null;
+        }
+        final List<Integer> starts = new ArrayList<>();
+        final List<Integer> ends = new ArrayList<>();
+        starts.add(0);
+        ends.add(length);
+        for (int i = 0; i < length; i++) {
+            if (run.charAt(i) != '_') {
+                continue;
+            }
+            if (i + 1 <= cursor && i + 1 < length) {
+                starts.add(i + 1);
+            }
+            if (i >= cursor && i > 0) {
+                ends.add(i);
+            }
+        }
+        int bestStart = -1;
+        int bestEnd = -1;
+        for (final int start : starts) {
+            for (final int end : ends) {
+                if (end - start <= bestEnd - bestStart) {
+                    continue;
+                }
+                if (isBlocked(run.substring(start, end))) {
+                    bestStart = start;
+                    bestEnd = end;
+                }
+            }
+        }
+        return bestStart < 0 ? null : new Hit(cursor - bestStart, bestEnd - cursor);
+    }
+
     /** The positions where an underscore-bounded ending of the run starts, longest ending first. */
     private static int[] endingStarts(final CharSequence run) {
         int count = 1;
@@ -291,6 +359,26 @@ public final class WordFilter {
             start -= Character.charCount(codePoint);
         }
         return end - start;
+    }
+
+    /**
+     * @param textAfterCursor the text immediately after the cursor, or null.
+     * @return the length, in UTF-16 units, of the run of word characters at the start of the text.
+     */
+    public static int leadingWordLength(final CharSequence textAfterCursor) {
+        if (textAfterCursor == null) {
+            return 0;
+        }
+        final int end = textAfterCursor.length();
+        int index = 0;
+        while (index < end) {
+            final int codePoint = Character.codePointAt(textAfterCursor, index);
+            if (!isWordCodePoint(codePoint)) {
+                break;
+            }
+            index += Character.charCount(codePoint);
+        }
+        return index;
     }
 
     /**

@@ -23,6 +23,12 @@ When you finish a word by typing a space, punctuation or Enter (including Enter 
 Sentryboard checks the word immediately before the cursor against your list. If it is on the list,
 the word is deleted and the separator you typed is inserted as usual. There is no toast or dialog.
 
+Editing a word that is already finished is covered too. Whenever there is text after the cursor, the
+whole word around the cursor (the part before it and the part after it) is checked right after each
+key, so slipping a blocked word through by typing `helo`, a space, and then going back to add the
+missing `l` does not work. That includes adding or deleting a letter inside a word, adding one at the
+end of a word that is followed by a space, and splitting or joining words with a space.
+
 Matching is by **whole word** and forgiving about disguise. Both the typed word and each list entry are
 normalized the same way before they are compared: accents are removed (`wórd` = `word`), case is
 ignored, apostrophes are ignored (`don't` = `dont`), and common leet substitutions are mapped
@@ -132,8 +138,13 @@ factory reset. Turning the lock off does not delete your word list; uninstalling
   expected and cannot be closed from inside a keyboard.
 - The pause setting can cut short a word you type slowly (if `ass` is blocked, pausing after `ass` in
   the middle of typing `assassin` deletes `ass`). That is why it is off by default.
-- Only the word immediately before the cursor is checked, when you type a separator there. Words you
-  edit in the middle of existing text are checked the next time you type a separator at that spot.
+- A word with text after the cursor counts as finished, so it is checked after every key. The
+  flip side: if you type a *longer* word in front of existing text and its first letters are a blocked
+  word, that blocked prefix is deleted early (with `hell` blocked, typing `hello` right before an
+  existing space deletes `hell` at the fourth letter). Typing at the very end of the text is not
+  affected, and neither are words that are not blocked.
+- Text edited by something other than the keyboard (pasting, dictation, the app itself) is not seen.
+  The edited word is only checked the next time you press a key next to it.
 - **Voice input and pasted text are not filtered.** A paste that starts with a separator does cause the
   word typed just before it to be checked.
 - It only works while Sentryboard is the active keyboard.

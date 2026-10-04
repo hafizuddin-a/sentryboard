@@ -107,6 +107,7 @@ public final class InputLogic {
         }
         // Space state must be updated before calling updateShiftState
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+        mWordBlock.afterEdit(settingsValues, getCurrentInputEditorInfo());
         mWordBlock.scheduleIdleRemoval(settingsValues, getCurrentInputEditorInfo());
         return inputTransaction;
     }
@@ -155,6 +156,7 @@ public final class InputLogic {
             }
             currentEvent = currentEvent.mNextEvent;
         }
+        mWordBlock.afterEdit(settingsValues, getCurrentInputEditorInfo());
         mWordBlock.scheduleIdleRemoval(settingsValues, getCurrentInputEditorInfo());
         return inputTransaction;
     }

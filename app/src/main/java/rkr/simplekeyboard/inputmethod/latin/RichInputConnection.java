@@ -318,6 +318,31 @@ public final class RichInputConnection {
         return text.length() <= n ? text : text.substring(text.length() - n);
     }
 
+    /**
+     * Reads up to {@code n} chars after the cursor straight from the editor, not from the cache.
+     *
+     * @return the text, or null if there is no connection or the editor returned nothing.
+     */
+    public CharSequence getTextAfterCursor(final int n) {
+        mIC = mLatinIME.getCurrentInputConnection();
+        return isConnected() ? mIC.getTextAfterCursor(n, 0) : null;
+    }
+
+    /** The first {@code n} chars after the cursor according to the local cache (see above). */
+    public CharSequence getCachedTextAfterCursor(final int n) {
+        final String text = mTextAfterCursor;
+        return text.length() <= n ? text : text.substring(0, n);
+    }
+
+    /** Deletes {@code numChars} chars after the cursor, which does not move. */
+    public void deleteTextAfterCursor(final int numChars) {
+        final String textAfterCursor = mTextAfterCursor;
+        if (textAfterCursor.length() >= numChars) {
+            mTextAfterCursor = textAfterCursor.substring(numChars);
+        }
+        mIC.deleteSurroundingText(0, numChars);
+    }
+
     public void replaceText(final int startPosition, final int endPosition, CharSequence text) {
         if (mExpectedSelStart != mExpectedSelEnd) {
             Log.e(TAG, "replaceText called with text range selected");
