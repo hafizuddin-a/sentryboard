@@ -757,4 +757,33 @@ public class WordFilterTest {
         }
         assertNull(filterOf("hello").blockedAround(many.toString(), many.toString()));
     }
+
+    // --- instant entries that end in a digit ---
+
+    @Test
+    public void instantEntryEndingInDigitsIsInstantAndBlocked() {
+        final WordFilter filter = filterOf("hello666!");
+        assertTrue(filter.hasInstantEntries());
+        assertTrue(filter.isInstant("Hello666"));
+        assertTrue(filter.isBlocked("hello666"));
+        assertEquals(8, filter.instantLength("Hello666"));
+        assertEquals(8, filter.instantLength("my_hello666"));
+        assertEquals(8, filter.blockedLength("Hello666"));
+    }
+
+    @Test
+    public void instantEntryEndingInDigitsIsNotInstantUntilTheLastDigit() {
+        final WordFilter filter = filterOf("hello666!");
+        assertEquals(0, filter.instantLength("Hello"));
+        assertEquals(0, filter.instantLength("Hello6"));
+        assertEquals(0, filter.instantLength("Hello66"));
+        assertEquals(0, filter.instantLength("Hello6666"));
+    }
+
+    @Test
+    public void instantEntryStartingWithDigitsMatches() {
+        final WordFilter filter = filterOf("666hello!");
+        assertEquals(8, filter.instantLength("666hello"));
+        assertEquals(0, filter.instantLength("66hello"));
+    }
 }

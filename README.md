@@ -148,8 +148,10 @@ factory reset. Turning the lock off does not delete your word list; uninstalling
 - **Voice input and pasted text are not filtered.** A paste that starts with a separator does cause the
   word typed just before it to be checked.
 - It only works while Sentryboard is the active keyboard.
-- Digits reach editors as asynchronous key events, so an `!` entry that *ends in a digit* is removed at
-  the next separator rather than instantly.
+- Digits reach editors as asynchronous key events, so an `!` entry that *ends in a digit* (such as
+  `word123!`) is removed a fraction of a second (about 0.15 s) after the last digit rather than at the
+  very moment it is typed. Typing another key within that moment cancels the wait, but the word is
+  still removed when you type a separator.
 - Because normalization strips combining marks, a blocked word in a script that uses them heavily
   (Indic scripts, Thai, Arabic vowel marks) is compared without those marks and can match other words
   with the same base letters. Word boundaries in such scripts are also approximate, since combining

@@ -57,7 +57,7 @@ public final class WordBlockController {
     private final RichInputConnection mConnection;
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final Runnable mIdleRemoval = this::removeAfterIdle;
-    private final Runnable mSettledCheck = this::removeAroundCursorAfterSettling;
+    private final Runnable mSettledCheck = this::checkAfterSettling;
     // Resolved on first use: this object is created while the service is still being constructed
     // and has no base context yet.
     private BlockedWordStore mStore;
@@ -131,16 +131,15 @@ public final class WordBlockController {
      * This runs on every word-character keystroke, so it first looks at the local text cache,
      * which costs nothing, and only asks the editor to confirm a hit. Acting on the editor's own
      * text also guarantees that what is deleted is what was checked.
+     *
+     * Digits are sent to the editor as asynchronous key events (see
+     * InputLogic#sendKeyCodePoint), so a read straight afterwards may not include them yet. The
+     * cache does, so a hit on a digit is confirmed a moment later instead (see
+     * {@link #SETTLE_MILLIS}), which is what lets an entry that ends in a digit be instant.
      */
     public void afterWordCharacter(final SettingsValues settingsValues,
             final EditorInfo editorInfo, final int codePoint) {
         try {
-            // Digits are sent to the editor as asynchronous key events (see
-            // InputLogic#sendKeyCodePoint), so a read straight afterwards may not include them yet.
-            // An instant entry that ends in a digit is still removed when a separator follows.
-            if (codePoint >= '0' && codePoint <= '9') {
-                return;
-            }
             if (!isActive(settingsValues, editorInfo)) {
                 return;
             }
@@ -156,19 +155,36 @@ public final class WordBlockController {
             }
             // Typing inside a word that goes on after the cursor: the whole word is judged by
             // afterEdit, not the part of it typed so far.
-            final CharSequence cachedAfter = mConnection.getCachedTextAfterCursor(2);
-            if (cachedAfter.length() > 0
-                    && WordFilter.isWordCodePoint(Character.codePointAt(cachedAfter, 0))) {
+            if (wordContinuesAfterCursor()) {
                 return;
             }
-            final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
-            final int length = run == null ? 0 : filter.instantLength(run);
-            if (length > 0) {
-                deleteNow(length);
+            if (codePoint >= '0' && codePoint <= '9') {
+                mHandler.removeCallbacks(mSettledCheck);
+                mHandler.postDelayed(mSettledCheck, SETTLE_MILLIS);
+                return;
             }
+            removeInstantWord(filter);
         } catch (RuntimeException e) {
             logFailure(e);
         }
+    }
+
+    /** Deletes the word before the cursor if the editor's text says it is an instant entry. */
+    private boolean removeInstantWord(final WordFilter filter) {
+        final int window = windowFor(filter);
+        final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
+        final int length = run == null ? 0 : filter.instantLength(run);
+        if (length == 0) {
+            return false;
+        }
+        deleteNow(length);
+        return true;
+    }
+
+    /** @return true if, going by the local cache, a word character follows the cursor. */
+    private boolean wordContinuesAfterCursor() {
+        final CharSequence after = mConnection.getCachedTextAfterCursor(2);
+        return after.length() > 0 && WordFilter.isWordCodePoint(Character.codePointAt(after, 0));
     }
 
     // ---- After editing a word that has text after the cursor ----------------------------------
@@ -198,11 +214,23 @@ public final class WordBlockController {
         }
     }
 
-    private void removeAroundCursorAfterSettling() {
+    /**
+     * The check that runs {@link #SETTLE_MILLIS} after a keystroke whose effect the editor may not
+     * have shown yet: an instant word ending in a digit, and the word around the cursor.
+     */
+    private void checkAfterSettling() {
         try {
-            final WordFilter filter = filterToCheckAroundCursor(Settings.getInstance().getCurrent(),
-                    mLatinIme.getCurrentInputEditorInfo());
-            if (filter != null) {
+            final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+            final EditorInfo editorInfo = mLatinIme.getCurrentInputEditorInfo();
+            if (!isActive(settingsValues, editorInfo) || mConnection.hasSelection()) {
+                return;
+            }
+            final WordFilter filter = getStore().getFilter();
+            if (filter.hasInstantEntries() && !wordContinuesAfterCursor()
+                    && removeInstantWord(filter)) {
+                return;
+            }
+            if (filterToCheckAroundCursor(settingsValues, editorInfo) != null) {
                 removeAroundCursor(filter);
             }
         } catch (RuntimeException e) {
