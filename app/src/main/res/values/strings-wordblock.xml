@@ -97,5 +97,11 @@
     <string name="wordblock_remove_confirm" translatable="false">Remove</string>
     <string name="wordblock_invalid" translatable="false">Use one word made of letters, digits, apostrophes and underscores, optionally ending in * or !</string>
     <string name="wordblock_duplicate" translatable="false">That word is already on the list</string>
+    <plurals name="wordblock_list_hidden" translatable="false">
+        <item quantity="one">%d blocked word</item>
+        <item quantity="other">%d blocked words</item>
+    </plurals>
+    <string name="wordblock_list_hidden_summary" translatable="false">The words are hidden while the settings are locked. You can still add words.</string>
+    <string name="wordblock_added_hidden" translatable="false">That word is on the list. The list stays hidden while the settings are locked.</string>
     <string name="wordblock_save_failed" translatable="false">Could not save the list</string>
 </resources>

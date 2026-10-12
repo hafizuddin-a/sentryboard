@@ -68,8 +68,10 @@ phone and date fields, and fields that declare no input type are never touched.
 ## Settings lock
 
 Under *Settings > Word filter > Settings lock* you can lock the filter's settings for a chosen
-duration. While locked you can still **view** the blocked-word list and **add** words to it: adding can
-only make the filter stronger. What is locked is **removing** words, the on/off switch, the pause
+duration. While locked the blocked-word list is **hidden** (the screen shows only how many words there
+are) and you can still **add** words to it: adding can only make the filter stronger. Adding a word
+that is already on the list gets the same answer as adding a new one, so the screen does not tell you
+what is on the list. The words show again once you unlock. What is locked is **removing** words, the on/off switch, the pause
 options, and the lock itself (its length, and removing it). Keyboard settings such as theme and height
 are not affected.
 
@@ -174,6 +176,8 @@ factory reset. Turning the lock off does not delete your word list; uninstalling
 - The settings lock only covers this app's own settings. It does not stop you switching to a different
   keyboard; a stronger lock would need Device Owner.
 - Adding a word is allowed while locked, on purpose; removing one is not.
+- Hiding the list only hides it on the settings screen. You can still find out whether a particular
+  word is on it by typing that word and seeing whether it is deleted.
 
 ## Building
 

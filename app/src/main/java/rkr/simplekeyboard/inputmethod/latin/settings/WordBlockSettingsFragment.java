@@ -320,12 +320,20 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
             addEntryPreference(empty);
             return;
         }
+        if (!editable) {
+            // While locked the list says how many words there are, but not which.
+            final Preference hidden = new Preference(getActivity());
+            hidden.setTitle(getResources().getQuantityString(R.plurals.wordblock_list_hidden,
+                    entries.size(), entries.size()));
+            hidden.setSummary(R.string.wordblock_list_hidden_summary);
+            hidden.setSelectable(false);
+            addEntryPreference(hidden);
+            return;
+        }
         for (final String entry : entries) {
             final Preference preference = new Preference(getActivity());
             preference.setTitle(entry);
             preference.setPersistent(false);
-            // Locked entries stay readable but cannot be opened for removal.
-            preference.setSelectable(editable);
             preference.setOnPreferenceClickListener(p -> {
                 showRemoveDialog(entry);
                 return true;
@@ -374,11 +382,18 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         if (entry.isEmpty()) {
             return;
         }
+        // While locked the list is hidden, so nothing here may say whether a word was on it already.
+        final boolean listHidden = !mGate.canModifyFilterSettings();
         if (!WordFilter.isValidEntry(entry)) {
             toast(R.string.wordblock_invalid);
         } else if (!mStore.add(entry)) {
-            toast(alreadyListed(entry) ? R.string.wordblock_duplicate
-                    : R.string.wordblock_save_failed);
+            if (!alreadyListed(entry)) {
+                toast(R.string.wordblock_save_failed);
+            } else {
+                toast(listHidden ? R.string.wordblock_added_hidden : R.string.wordblock_duplicate);
+            }
+        } else if (listHidden) {
+            toast(R.string.wordblock_added_hidden);
         }
         refresh();
     }
