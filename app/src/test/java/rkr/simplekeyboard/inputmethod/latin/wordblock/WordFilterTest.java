@@ -210,7 +210,10 @@ public class WordFilterTest {
         assertTrue(filterOf("word", "other!").hasInstantEntries());
         assertFalse(new WordFilter(Collections.<String>emptyList()).hasInstantEntries());
         // Instant entries that cannot match anything do not count.
-        assertFalse(filterOf("two words!").hasInstantEntries());
+        assertFalse(filterOf("two x.y!").hasInstantEntries());
+        // A phrase can be instant too.
+        assertTrue(filterOf("two words!").hasInstantEntries());
+        assertFalse(filterOf("two words", "other*").hasInstantEntries());
     }
 
     // --- List hygiene ---
@@ -248,7 +251,7 @@ public class WordFilterTest {
 
     @Test
     public void unusableEntriesAreIgnored() {
-        final WordFilter filter = filterOf("two words", "*", "!", "a-b", "x.y", "word!*");
+        final WordFilter filter = filterOf("two x.y", "*", "!", "a-b", "x.y", "word!*", "hello _");
         assertTrue(filter.isEmpty());
         assertFalse(filter.isBlocked("words"));
         assertFalse(filter.isBlocked("two"));
@@ -264,7 +267,16 @@ public class WordFilterTest {
         assertFalse(WordFilter.isValidEntry("   "));
         assertFalse(WordFilter.isValidEntry("*"));
         assertFalse(WordFilter.isValidEntry("!"));
-        assertFalse(WordFilter.isValidEntry("two words"));
+        assertTrue(WordFilter.isValidEntry("two words"));
+        assertTrue(WordFilter.isValidEntry("two words*"));
+        assertTrue(WordFilter.isValidEntry("two words!"));
+        assertTrue(WordFilter.isValidEntry("  two \t  words  "));
+        assertTrue(WordFilter.isValidEntry("don't be mean"));
+        assertTrue(WordFilter.isValidEntry("my_two words"));
+        assertFalse(WordFilter.isValidEntry("two a-b"));
+        assertFalse(WordFilter.isValidEntry("two, words"));
+        assertFalse(WordFilter.isValidEntry("hello _"));
+        assertFalse(WordFilter.isValidEntry("hello '"));
         assertFalse(WordFilter.isValidEntry("a-b"));
         assertFalse(WordFilter.isValidEntry("'"));
         assertFalse(WordFilter.isValidEntry(null));
@@ -407,8 +419,9 @@ public class WordFilterTest {
     public void otherPunctuationInAnEntryIsStillRejected() {
         assertFalse(WordFilter.isValidEntry("snake-case"));
         assertFalse(WordFilter.isValidEntry("snake.case"));
-        assertFalse(WordFilter.isValidEntry("snake case"));
         assertFalse(WordFilter.isValidEntry("snake_case,"));
+        // Two words separated by a space are a phrase, which is a valid entry.
+        assertTrue(WordFilter.isValidEntry("snake case"));
     }
 
     @Test
@@ -785,5 +798,222 @@ public class WordFilterTest {
         final WordFilter filter = filterOf("666hello!");
         assertEquals(8, filter.instantLength("666hello"));
         assertEquals(0, filter.instantLength("66hello"));
+    }
+
+    // --- phrases ---
+
+    private static String spaces(final int count) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            sb.append(' ');
+        }
+        return sb.toString();
+    }
+
+    @Test
+    public void tidyEntryCollapsesWhitespace() {
+        assertEquals("two words", WordFilter.tidyEntry("  two \t  words\n"));
+        assertEquals("two words", WordFilter.tidyEntry("two words"));
+        assertEquals("word", WordFilter.tidyEntry(" word "));
+        assertEquals("", WordFilter.tidyEntry("   "));
+        assertEquals(null, WordFilter.tidyEntry(null));
+    }
+
+    @Test
+    public void phraseIsBlockedAtTheEndOfTheText() {
+        final WordFilter filter = filterOf("hello world");
+        assertEquals(11, filter.blockedLengthBefore("hello world"));
+        assertEquals(11, filter.blockedLengthBefore("say hello world"));
+        assertEquals(11, filter.blockedLengthBefore("Say HELLO World"));
+        assertFalse(filter.isEmpty());
+    }
+
+    @Test
+    public void phraseNeedsEveryWordWhole() {
+        final WordFilter filter = filterOf("hello world");
+        assertEquals(0, filter.blockedLengthBefore("hello"));
+        assertEquals(0, filter.blockedLengthBefore("world"));
+        assertEquals(0, filter.blockedLengthBefore("xhello world"));
+        assertEquals(0, filter.blockedLengthBefore("hello worlds"));
+        assertEquals(0, filter.blockedLengthBefore("hello world2"));
+        assertEquals(0, filter.blockedLengthBefore("hello there world"));
+        assertEquals(0, filter.blockedLengthBefore("world hello"));
+        assertEquals(0, filter.blockedLengthBefore(""));
+        assertEquals(0, filter.blockedLengthBefore(null));
+    }
+
+    @Test
+    public void phraseToleratesAnyGapBetweenTheWords() {
+        final WordFilter filter = filterOf("hello world");
+        final String[] texts = {"hello  world", "hello, world", "hello\nworld", "hello_world",
+                "hello - world", "hello ... world", "hello@ world", "hello @ world",
+                "hello\t\tworld", "hello — world"};
+        for (final String text : texts) {
+            assertEquals(text, text.length(), filter.blockedLengthBefore(text));
+        }
+    }
+
+    @Test
+    public void phraseGapHasALimit() {
+        final WordFilter filter = filterOf("hello world");
+        final String atLimit = "hello" + spaces(PhraseSet.MAX_GAP) + "world";
+        final String overLimit = "hello" + spaces(PhraseSet.MAX_GAP + 1) + "world";
+        assertEquals(atLimit.length(), filter.blockedLengthBefore(atLimit));
+        assertEquals(0, filter.blockedLengthBefore(overLimit));
+    }
+
+    @Test
+    public void phraseWordsAreNormalizedLikeSingleWords() {
+        final WordFilter filter = filterOf("hello world");
+        assertEquals(11, filter.blockedLengthBefore("H3LLO w0rld"));
+        assertEquals(11, filter.blockedLengthBefore("héllo wörld"));
+        assertEquals(13, filter.blockedLengthBefore("@hello world$"));
+        assertEquals(7, filterOf("don't be").blockedLengthBefore("dont be"));
+        assertEquals(8, filterOf("don't be").blockedLengthBefore("don't be"));
+        assertEquals(11, filterOf("héllo w0rld").blockedLengthBefore("hello world"));
+    }
+
+    @Test
+    public void phraseWildcardAppliesToTheLastWord() {
+        final WordFilter filter = filterOf("hello wor*");
+        assertEquals(11, filter.blockedLengthBefore("hello world"));
+        assertEquals(15, filter.blockedLengthBefore("hello worldwide"));
+        assertEquals(9, filter.blockedLengthBefore("hello wor"));
+        assertEquals(0, filter.blockedLengthBefore("hello wo"));
+        assertEquals(0, filter.blockedLengthBefore("hellos world"));
+    }
+
+    @Test
+    public void phraseMustEndAtTheCursor() {
+        final WordFilter filter = filterOf("hello world");
+        assertEquals(0, filter.blockedLengthBefore("hello world "));
+        assertEquals(0, filter.blockedLengthBefore("hello world!"));
+    }
+
+    @Test
+    public void aPhraseWinsOverAWordInsideIt() {
+        final WordFilter filter = filterOf("world", "hello world");
+        assertEquals(11, filter.blockedLengthBefore("say hello world"));
+        assertEquals(5, filter.blockedLengthBefore("say world"));
+        assertEquals(0, filter.blockedLengthBefore("hello"));
+    }
+
+    @Test
+    public void longerPhrasesAndUnderscoresInEntries() {
+        final WordFilter three = filterOf("one two three");
+        assertEquals(13, three.blockedLengthBefore("one two three"));
+        assertEquals(13, three.blockedLengthBefore("x one two three"));
+        assertEquals(0, three.blockedLengthBefore("one two"));
+        assertEquals(0, three.blockedLengthBefore("two three"));
+        assertEquals(0, three.blockedLengthBefore("one two" + spaces(PhraseSet.MAX_GAP + 1) + "three"));
+        // Underscores split the words of a phrase on both sides.
+        final WordFilter snake = filterOf("snake_case other");
+        assertEquals(16, snake.blockedLengthBefore("snake case other"));
+        assertEquals(16, snake.blockedLengthBefore("snake_case other"));
+        assertEquals(16, snake.blockedLengthBefore("snake-case other"));
+    }
+
+    @Test
+    public void instantPhrase() {
+        final WordFilter filter = filterOf("hello world!", "kill!");
+        assertTrue(filter.hasInstantEntries());
+        assertEquals(11, filter.instantLengthBefore("say hello world"));
+        assertEquals(4, filter.instantLengthBefore("say kill"));
+        assertEquals(0, filter.instantLengthBefore("say hello"));
+        assertEquals(11, filter.blockedLengthBefore("hello world"));
+        // A plain phrase is not instant.
+        assertEquals(0, filterOf("hello world").instantLengthBefore("hello world"));
+        // The marker belongs to the last word, not to the phrase as a string.
+        assertEquals(0, filterOf("hello world!").instantLengthBefore("hello worlds"));
+    }
+
+    @Test
+    public void maxEntryLengthCountsTheWidestGaps() {
+        assertEquals(5 + 5 + PhraseSet.MAX_GAP, filterOf("hello world").maxEntryLength());
+        assertEquals(1 + 2 + 3 + 2 * PhraseSet.MAX_GAP, filterOf("a bb ccc").maxEntryLength());
+        assertEquals(4, filterOf("word").maxEntryLength());
+    }
+
+    @Test
+    public void blockedLengthBeforeMatchesBlockedLengthForSingleWords() {
+        final WordFilter filter = filterOf("word", "snake_case", "hello*");
+        final String[] runs = {"word", "my_word", "a_b_word", "snake_case", "hello", "helloes",
+                "words", "sword", "@word", "word$", "w0rd", "x"};
+        for (final String run : runs) {
+            assertEquals(run, filter.blockedLength(run), filter.blockedLengthBefore(run));
+            assertEquals(run, filter.blockedLength(run), filter.blockedLengthBefore("say " + run));
+        }
+    }
+
+    @Test
+    public void tokensAreWordsWithoutUnderscoresOrLoneSymbols() {
+        final List<int[]> spans = PhraseSet.tokenSpans("a_b @ c's, d");
+        assertEquals(4, spans.size());
+        assertEquals(0, spans.get(0)[0]);
+        assertEquals(1, spans.get(0)[1]);
+        assertEquals(2, spans.get(1)[0]);
+        assertEquals(3, spans.get(1)[1]);
+        assertEquals(6, spans.get(2)[0]);
+        assertEquals(9, spans.get(2)[1]);
+        assertEquals(11, spans.get(3)[0]);
+        assertEquals(12, spans.get(3)[1]);
+        assertEquals(0, PhraseSet.tokenSpans("  ... @ $ '  ").size());
+    }
+
+    // --- phrases being edited ---
+
+    @Test
+    public void blockedAroundFindsAPhraseCompletedInTheMiddle() {
+        final WordFilter filter = filterOf("hello world");
+        assertHit(9, 2, filter.blockedAround("hello wor", "ld"));
+        assertHit(6, 5, filter.blockedAround("hello ", "world"));
+        assertHit(5, 6, filter.blockedAround("hello", " world"));
+        assertHit(4, 7, filter.blockedAround("hell", "o world"));
+        assertHit(7, 4, filter.blockedAround("x hello w", "orld y"));
+        assertHit(11, 0, filter.blockedAround("say hello world".substring(4), ""));
+    }
+
+    @Test
+    public void blockedAroundLeavesPhrasesThatAreNotThereOrNotTouched() {
+        final WordFilter filter = filterOf("hello world");
+        assertNull(filter.blockedAround("hello wrld", ""));
+        assertNull(filter.blockedAround("hello ", "there"));
+        assertNull(filter.blockedAround("helloworld", ""));
+        // A phrase elsewhere in the text was not edited.
+        assertNull(filter.blockedAround("hello world and ", "bye"));
+        // ...but one that starts right at the cursor is being touched.
+        assertHit(0, 11, filter.blockedAround("bye ", "hello world and more"));
+    }
+
+    @Test
+    public void blockedAroundCatchesAPhraseSplitByInsertingASpace() {
+        final WordFilter filter = filterOf("hello world");
+        // "helloworld" is one word; a space typed in the middle makes the phrase.
+        assertHit(6, 5, filter.blockedAround("hello ", "world"));
+        assertHit(6, 5, filter.blockedAround("hello ", "world."));
+    }
+
+    @Test
+    public void blockedAroundPrefersTheWiderOfAWordAndAPhrase() {
+        final WordFilter filter = filterOf("world", "hello world");
+        assertHit(9, 2, filter.blockedAround("hello wor", "ld"));
+        assertHit(3, 2, filterOf("world").blockedAround("hello wor", "ld"));
+    }
+
+    @Test
+    public void dropPartialStartRemovesAFirstWordThatMayBeCut() {
+        assertEquals(" def", WordFilter.dropPartialStart("abc def").toString());
+        assertEquals("", WordFilter.dropPartialStart("def").toString());
+        assertEquals(" def", WordFilter.dropPartialStart(" def").toString());
+        assertEquals("", WordFilter.dropPartialStart("").toString());
+        assertEquals(" def", WordFilter.dropPartialStart("a_b'c def").toString());
+    }
+
+    @Test
+    public void dropPartialEndRemovesALastWordThatMayBeCut() {
+        assertEquals("abc ", WordFilter.dropPartialEnd("abc de").toString());
+        assertEquals("", WordFilter.dropPartialEnd("abc").toString());
+        assertEquals("abc ", WordFilter.dropPartialEnd("abc ").toString());
+        assertEquals("", WordFilter.dropPartialEnd("").toString());
     }
 }

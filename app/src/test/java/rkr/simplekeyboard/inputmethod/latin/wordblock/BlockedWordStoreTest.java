@@ -65,7 +65,7 @@ public class BlockedWordStoreTest {
         assertFalse(store.add(null));
         assertFalse(store.add(""));
         assertFalse(store.add("   "));
-        assertFalse(store.add("two words"));
+        assertFalse(store.add("two x.y"));
         assertFalse(store.add("*"));
         final StringBuilder tooLong = new StringBuilder();
         for (int i = 0; i <= BlockedWordStore.MAX_ENTRY_LENGTH; i++) {
@@ -104,7 +104,7 @@ public class BlockedWordStoreTest {
     @Test
     public void loadSkipsBlankDuplicateAndUnusableLines() throws IOException {
         Files.write(file().toPath(),
-                "word\n\n  \nWORD\ntwo words\n *\nother!\r\n".getBytes(StandardCharsets.UTF_8));
+                "word\n\n  \nWORD\ntwo x.y\n *\nother!\r\n".getBytes(StandardCharsets.UTF_8));
         final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertEquals(Arrays.asList("word", "other!"), store.getEntries());
     }
@@ -159,7 +159,7 @@ public class BlockedWordStoreTest {
         final BlockedWordStore store = new BlockedWordStore(file(), () -> false);
         assertTrue(store.add("word"));
         assertFalse(store.add("word"));
-        assertFalse(store.add("two words"));
+        assertFalse(store.add("two x.y"));
         assertFalse(store.add(""));
         assertEquals(Collections.singletonList("word"), store.getEntries());
     }
@@ -212,5 +212,33 @@ public class BlockedWordStoreTest {
         Files.write(file().toPath(), "word\n".getBytes(StandardCharsets.UTF_8));
         final BlockedWordStore store = new BlockedWordStore(file(), () -> false);
         assertEquals(Collections.singletonList("word"), store.getEntries());
+    }
+
+    @Test
+    public void phrasesAreStoredWithTidyWhitespace() {
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
+        assertTrue(store.add("  two \t  words  "));
+        assertEquals(Collections.singletonList("two words"), store.getEntries());
+        // The same phrase with different spacing or case is a duplicate.
+        assertFalse(store.add("two words"));
+        assertFalse(store.add("TWO   WORDS"));
+        assertEquals(10, store.getFilter().blockedLengthBefore("say two  words"));
+        final BlockedWordStore reloaded = new BlockedWordStore(file(), OPEN);
+        assertEquals(Collections.singletonList("two words"), reloaded.getEntries());
+    }
+
+    @Test
+    public void aPhraseCanBeRemovedWithDifferentSpacing() {
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
+        assertTrue(store.add("two words"));
+        assertTrue(store.remove("two    words"));
+        assertTrue(store.getEntries().isEmpty());
+    }
+
+    @Test
+    public void loadTidiesPhrasesFromAFile() throws IOException {
+        Files.write(file().toPath(), "two   words\nTWO words\nother!\n".getBytes(StandardCharsets.UTF_8));
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
+        assertEquals(Arrays.asList("two words", "other!"), store.getEntries());
     }
 }

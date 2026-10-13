@@ -37,10 +37,14 @@ import java.util.regex.Pattern;
  * <li>{@code word*} - blocks any word that starts with {@code word}.</li>
  * <li>{@code word!} - blocks exactly that word, and also marks it "instant" so it can be removed
  *     as soon as it has been typed instead of waiting for a separator.</li>
+ * <li>{@code two words} - blocks that phrase: any number of words separated by whitespace, and
+ *     written with whatever gap (spaces, punctuation, line breaks) between them. See
+ *     {@link PhraseSet}. {@code *} and {@code !} apply to the last word.</li>
  * </ul>
- * Entries that cannot ever match a single typed word (blank, or containing anything other than
- * letters, digits, apostrophes, underscores, {@code @} and {@code $} once the marker is removed, or
- * having no letter or digit at all) are ignored.
+ * Entries that cannot ever match what is typed (blank, or containing anything other than
+ * letters, digits, apostrophes, underscores, {@code @}, {@code $} and, for a phrase, the
+ * whitespace between its words, once the marker is removed, or having no letter or digit at all)
+ * are ignored.
  *
  * <h3>Normalization</h3>
  * Typed words and list entries go through the same pipeline: NFKD with combining marks removed,
@@ -55,6 +59,7 @@ public final class WordFilter {
     private final Set<String> mWholeWords = new HashSet<>();
     private final Set<String> mInstantWords = new HashSet<>();
     private final Set<String> mStems = new HashSet<>();
+    private final PhraseSet mPhrases = new PhraseSet();
     private int mMinStemLength = Integer.MAX_VALUE;
     private int mMaxStemLength = 0;
     private int mMaxEntryLength = 0;
@@ -66,6 +71,14 @@ public final class WordFilter {
         for (final String rawEntry : rawEntries) {
             final Entry entry = Entry.parse(rawEntry);
             if (entry == null) {
+                continue;
+            }
+            if (entry.mPhraseWords != null) {
+                final List<Set<String>> words = new ArrayList<>();
+                for (final String word : entry.mPhraseWords) {
+                    words.add(variantsOf(word));
+                }
+                mPhrases.add(words, entry.mWildcard, entry.mInstant);
                 continue;
             }
             for (final String variant : variantsOf(entry.mBody)) {
@@ -94,7 +107,33 @@ public final class WordFilter {
 
     /** @return true if there is nothing to match against, so callers can skip all work. */
     public boolean isEmpty() {
-        return mWholeWords.isEmpty() && mStems.isEmpty();
+        return mWholeWords.isEmpty() && mStems.isEmpty() && mPhrases.isEmpty();
+    }
+
+    /**
+     * Cleans up an entry the way it is stored: surrounding whitespace removed, and each run of
+     * whitespace inside it (which separates the words of a phrase) made one plain space.
+     */
+    public static String tidyEntry(final String rawEntry) {
+        if (rawEntry == null) {
+            return null;
+        }
+        final String trimmed = trimWhitespace(rawEntry);
+        final StringBuilder tidy = new StringBuilder(trimmed.length());
+        boolean pendingSpace = false;
+        for (int i = 0; i < trimmed.length(); i++) {
+            final char c = trimmed.charAt(i);
+            if (isWhitespace(c)) {
+                pendingSpace = true;
+                continue;
+            }
+            if (pendingSpace) {
+                tidy.append(' ');
+                pendingSpace = false;
+            }
+            tidy.append(c);
+        }
+        return tidy.toString();
     }
 
     /**
@@ -191,24 +230,91 @@ public final class WordFilter {
     }
 
     /**
-     * Finds a blocked word that contains or touches the cursor, for text that was edited inside or
-     * right next to a word that already had something after it. {@link #blockedLength} only sees
-     * the end of a word, so it cannot tell that typing the {@code l} of {@code hel|o} has just made
-     * {@code hello}.
+     * Finds the blocked word or phrase at the end of the text before the cursor: what to delete
+     * when a separator is about to be typed there. This is {@link #blockedLength} for the last word
+     * of the text, and also looks for a phrase that ends at the cursor. If both a word and a phrase
+     * match, the phrase (which includes the word) is what to delete.
      *
-     * The run is the word characters before the cursor followed by the word characters after it. As
-     * in {@link #blockedLength}, an underscore-bounded stretch of the run is tried as a word of its
-     * own, but only one that reaches the cursor, so that a blocked word elsewhere in the run is
-     * left as it was. The widest blocked stretch wins.
+     * @param textBeforeCursor the text just before the cursor, which must not start in the middle
+     * of a word (see {@link #dropPartialStart}).
+     * @return how many UTF-16 units at the end of the text are blocked, or 0 if none are.
+     */
+    public int blockedLengthBefore(final CharSequence textBeforeCursor) {
+        if (isEmpty() || textBeforeCursor == null) {
+            return 0;
+        }
+        final int length = textBeforeCursor.length();
+        final int run = trailingWordLength(textBeforeCursor);
+        final int word = run == 0 ? 0 : blockedLength(textBeforeCursor.subSequence(length - run, length));
+        return Math.max(word, mPhrases.lengthBefore(textBeforeCursor, false));
+    }
+
+    /** Like {@link #blockedLengthBefore}, for entries marked with {@code !}. */
+    public int instantLengthBefore(final CharSequence textBeforeCursor) {
+        if (!hasInstantEntries() || textBeforeCursor == null) {
+            return 0;
+        }
+        final int length = textBeforeCursor.length();
+        final int run = trailingWordLength(textBeforeCursor);
+        final int word = run == 0 ? 0 : instantLength(textBeforeCursor.subSequence(length - run, length));
+        return Math.max(word, mPhrases.lengthBefore(textBeforeCursor, true));
+    }
+
+    /**
+     * Drops the run of word characters at the start of text read back from the editor, which the
+     * edge of the window may have cut in half. Only for text that fills its window: if the text
+     * ends before the window does, its first word is whole.
      *
-     * @param beforeRun the run of word characters that ends at the cursor (may be empty).
-     * @param afterRun the run of word characters that starts at the cursor (may be empty).
+     * @return the text from its first non-word character, or an empty text if it has none.
+     */
+    public static CharSequence dropPartialStart(final CharSequence text) {
+        int start = 0;
+        while (start < text.length()) {
+            final int codePoint = Character.codePointAt(text, start);
+            if (!isWordCodePoint(codePoint)) {
+                break;
+            }
+            start += Character.charCount(codePoint);
+        }
+        return text.subSequence(start, text.length());
+    }
+
+    /** Like {@link #dropPartialStart}, for the end of text read back from after the cursor. */
+    public static CharSequence dropPartialEnd(final CharSequence text) {
+        return text.subSequence(0, text.length() - trailingWordLength(text));
+    }
+
+    /**
+     * Finds a blocked word or phrase that contains or touches the cursor, for text that was edited
+     * inside or right next to a word that already had something after it. {@link #blockedLength}
+     * only sees the end of a word, so it cannot tell that typing the {@code l} of {@code hel|o} has
+     * just made {@code hello}, or that the {@code d} of {@code hello worl|d} has finished a phrase.
+     *
+     * For a single word, the run is the word characters before the cursor followed by the word
+     * characters after it. As in {@link #blockedLength}, an underscore-bounded stretch of the run is
+     * tried as a word of its own, but only one that reaches the cursor, so that a blocked word
+     * elsewhere in the run is left as it was. A phrase is looked for among the words around the
+     * cursor, and counts if it contains or touches the cursor. The widest match wins.
+     *
+     * @param before the text before the cursor, which must not start in the middle of a word.
+     * @param after the text after the cursor, which must not end in the middle of a word.
      * @return what to delete, or null if nothing around the cursor is blocked.
      */
-    public Hit blockedAround(final CharSequence beforeRun, final CharSequence afterRun) {
-        if (isEmpty() || beforeRun == null || afterRun == null) {
+    public Hit blockedAround(final CharSequence before, final CharSequence after) {
+        if (isEmpty() || before == null || after == null) {
             return null;
         }
+        final int beforeRun = trailingWordLength(before);
+        final Hit word = wordAround(before.subSequence(before.length() - beforeRun, before.length()),
+                after.subSequence(0, leadingWordLength(after)));
+        final Hit phrase = mPhrases.around(before, after);
+        if (word == null || phrase == null) {
+            return word == null ? phrase : word;
+        }
+        return phrase.before + phrase.after > word.before + word.after ? phrase : word;
+    }
+
+    private Hit wordAround(final CharSequence beforeRun, final CharSequence afterRun) {
         final int cursor = beforeRun.length();
         final String run = new StringBuilder(cursor + afterRun.length())
                 .append(beforeRun).append(afterRun).toString();
@@ -272,7 +378,7 @@ public final class WordFilter {
      * far more likely to be a mention, a price or other punctuation ({@code @word}, {@code word$},
      * {@code _word_}), and must not let a blocked word through.
      */
-    private static List<CharSequence> candidates(final CharSequence word) {
+    static List<CharSequence> candidates(final CharSequence word) {
         final List<CharSequence> result = new ArrayList<>(4);
         result.add(word);
         int start = 0;
@@ -300,15 +406,16 @@ public final class WordFilter {
 
     /** @return true if at least one entry is marked with {@code !}. */
     public boolean hasInstantEntries() {
-        return !mInstantWords.isEmpty();
+        return !mInstantWords.isEmpty() || mPhrases.hasInstant();
     }
 
     /**
-     * @return the length of the longest normalized entry, in chars. Used to size the window of
-     * text that is read back from the editor.
+     * @return the length of the longest normalized entry, in chars, counting the widest gaps that
+     * may separate the words of a phrase. Used to size the window of text that is read back from
+     * the editor.
      */
     public int maxEntryLength() {
-        return mMaxEntryLength;
+        return Math.max(mMaxEntryLength, mPhrases.maxLength());
     }
 
     /**
@@ -459,11 +566,15 @@ public final class WordFilter {
         final String mBody;
         final boolean mWildcard;
         final boolean mInstant;
+        /** The words of a phrase, or null for an entry that is a single word. */
+        final List<String> mPhraseWords;
 
-        private Entry(final String body, final boolean wildcard, final boolean instant) {
+        private Entry(final String body, final boolean wildcard, final boolean instant,
+                final List<String> phraseWords) {
             mBody = body;
             mWildcard = wildcard;
             mInstant = instant;
+            mPhraseWords = phraseWords;
         }
 
         /** @return the parsed entry, or null if the line is blank or can never match a word. */
@@ -484,6 +595,9 @@ public final class WordFilter {
             if (body.isEmpty()) {
                 return null;
             }
+            if (containsWhitespace(body)) {
+                return parsePhrase(body, wildcard, instant);
+            }
             // Normalization only changes letters into other letters and drops apostrophes, so any
             // character left over that is not a letter, digit or underscore means the entry could
             // never match a typed word. At least one letter or digit is needed: an entry made of
@@ -494,7 +608,64 @@ public final class WordFilter {
                     return null;
                 }
             }
-            return new Entry(body, wildcard, instant);
+            return new Entry(body, wildcard, instant, null);
+        }
+
+        /**
+         * A phrase is two or more words separated by whitespace. Underscores separate words too, as
+         * in the text it is matched against (see {@link PhraseSet}), and each word must be made of
+         * letters and digits only once normalized.
+         */
+        private static Entry parsePhrase(final String body, final boolean wildcard,
+                final boolean instant) {
+            final List<String> words = new ArrayList<>();
+            final StringBuilder word = new StringBuilder();
+            for (int i = 0; i <= body.length(); i++) {
+                final char c = i < body.length() ? body.charAt(i) : ' ';
+                if (c != '_' && !isWhitespace(c)) {
+                    word.append(c);
+                } else if (word.length() > 0) {
+                    words.add(word.toString());
+                    word.setLength(0);
+                }
+            }
+            if (words.size() < 2) {
+                return null;
+            }
+            final StringBuilder joined = new StringBuilder();
+            for (final String each : words) {
+                for (final String variant : variantsOf(each)) {
+                    if (!isUsableWord(variant)) {
+                        return null;
+                    }
+                }
+                joined.append(joined.length() > 0 ? " " : "").append(each);
+            }
+            return new Entry(joined.toString(), wildcard, instant, words);
+        }
+
+        private static boolean containsWhitespace(final String s) {
+            for (int i = 0; i < s.length(); i++) {
+                if (isWhitespace(s.charAt(i))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** @return true if the (normalized) word is made of letters and digits, and not empty. */
+        private static boolean isUsableWord(final String s) {
+            if (s.isEmpty()) {
+                return false;
+            }
+            for (int i = 0; i < s.length(); ) {
+                final int codePoint = s.codePointAt(i);
+                if (!Character.isLetterOrDigit(codePoint)) {
+                    return false;
+                }
+                i += Character.charCount(codePoint);
+            }
+            return true;
         }
 
         private static boolean isUsableBody(final String s) {

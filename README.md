@@ -20,8 +20,8 @@ next horizontal rule is upstream's README, unchanged.
 ## What it does
 
 When you finish a word by typing a space, punctuation or Enter (including Enter as Send / Go / Next),
-Sentryboard checks the word immediately before the cursor against your list. If it is on the list,
-the word is deleted and the separator you typed is inserted as usual. There is no toast or dialog.
+Sentryboard checks the word immediately before the cursor (and the words before it, for a phrase)
+against your list. If it is on the list, the word or phrase is deleted and the separator you typed is inserted as usual. There is no toast or dialog.
 
 Editing a word that is already finished is covered too. Whenever there is text after the cursor, the
 whole word around the cursor (the part before it and the part after it) is checked right after each
@@ -44,10 +44,30 @@ One entry per line in *Settings > Word filter*:
 | `word`  | Blocks exactly that word. |
 | `word*` | Also blocks longer words that start with `word` (`words`, `wording`, but not `sword`). |
 | `word!` | Blocks exactly that word **and removes it the instant it is typed**, without waiting for a separator. Use it only for words that are not the start of harmless words: with `ass!`, typing `assess` deletes `ass` as soon as its third letter is typed. |
+| `two words` | Blocks that **phrase**: two or more words separated by spaces. See [Phrases](#phrases). |
 
-An entry must be a single word of letters, digits, apostrophes, underscores, `@` and `$`, optionally ending
-in `*` or `!`, with at least one letter or digit. Anything else (spaces, hyphens, other punctuation) could
-never match a typed word and is rejected.
+An entry must be made of words of letters, digits, apostrophes, underscores, `@` and `$`, separated by
+spaces if there is more than one, optionally ending in `*` or `!`, with at least one letter or digit in
+every word. Anything else (hyphens, other punctuation) could never match what is typed and is rejected.
+
+### Phrases
+
+An entry of several words, such as `hello world`, blocks that phrase. When you finish its last word, the
+whole phrase is deleted together (including the spaces between the words), and what is around it stays.
+
+- **Any gap counts.** `hello  world` (two spaces), `hello, world`, `hello - world`, `hello_world` and a
+  line break between the words all match `hello world`. The gap can be up to 64 characters; longer than
+  that, the words are no longer treated as one phrase.
+- **Every word is matched whole and disguised the same way as a single word**: accents, case and leet
+  (`H3LLO w0rld`) do not get past it. `hello worlds`, `shello world` and `hello there world` are not
+  matches.
+- **`*` and `!` apply to the last word.** `hello wor*` also blocks `hello world` and `hello worldwide`;
+  `hello world!` deletes the phrase the moment its last letter is typed.
+- **Editing a finished phrase is caught too**, the same way as for single words (see
+  [What it does](#what-it-does)): adding the missing letter to `hello wrld`, deleting the extra one from
+  `hello worldx`, or putting a space into `helloworld`.
+- Underscores split the words of a phrase on both sides, so an entry of `snake_case other` is a phrase of
+  three words. A single entry with no spaces keeps its old meaning: `snake_case` is one word.
 
 Underscores are part of a word, so `snake_case` can be an entry and is matched as one word. They also
 mark a checkpoint: a blocked word right before an underscore (`word` in `word_list`) is still removed
@@ -162,7 +182,11 @@ factory reset. Turning the lock off does not delete your word list; uninstalling
   At the very start or end of a word they are ignored when matching, so `@word` and `word$` are still
   caught. The flip side is that `me@word.com` is treated as the single word `me@word`, so `word` is not
   caught inside an address.
-- Multi-word phrases are not supported.
+- A phrase is only caught while its words are typed in order and close together (a gap of at most 64
+  characters). Two blocked words far apart, or in the other order, are not a phrase.
+- As with single words, typing a *longer* phrase in front of existing text can delete a blocked
+  start of it early: with `hello world` blocked, typing `hello worldwide` right before an existing space
+  deletes `hello world` at the last letter of `world`.
 
 ### Settings lock and uninstall protection
 

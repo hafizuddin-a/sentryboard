@@ -110,8 +110,8 @@ public final class WordBlockController {
             }
             final int window = windowFor(filter);
             // Some editors (terminals, custom views) return null. Then there is nothing to check.
-            final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
-            final int length = run == null ? 0 : filter.blockedLength(run);
+            final int length = filter.blockedLengthBefore(
+                    wholeWordsOnly(mConnection.getTextBeforeCursor(window), window));
             if (length == 0) {
                 return false;
             }
@@ -148,9 +148,8 @@ public final class WordBlockController {
                 return;
             }
             final int window = windowFor(filter);
-            final CharSequence cachedRun =
-                    trailingWord(mConnection.getCachedTextBeforeCursor(window), window);
-            if (cachedRun == null || filter.instantLength(cachedRun) == 0) {
+            if (filter.instantLengthBefore(wholeWordsOnly(
+                    mConnection.getCachedTextBeforeCursor(window), window)) == 0) {
                 return;
             }
             // Typing inside a word that goes on after the cursor: the whole word is judged by
@@ -169,11 +168,11 @@ public final class WordBlockController {
         }
     }
 
-    /** Deletes the word before the cursor if the editor's text says it is an instant entry. */
+    /** Deletes the word or phrase before the cursor if the editor's text says it is an instant entry. */
     private boolean removeInstantWord(final WordFilter filter) {
         final int window = windowFor(filter);
-        final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
-        final int length = run == null ? 0 : filter.instantLength(run);
+        final int length = filter.instantLengthBefore(
+                wholeWordsOnly(mConnection.getTextBeforeCursor(window), window));
         if (length == 0) {
             return false;
         }
@@ -255,21 +254,15 @@ public final class WordBlockController {
 
     private void removeAroundCursor(final WordFilter filter) {
         final int window = windowFor(filter);
-        final CharSequence before = mConnection.getTextBeforeCursor(window);
+        final CharSequence before = wholeWordsOnly(mConnection.getTextBeforeCursor(window), window);
         final CharSequence after = mConnection.getTextAfterCursor(window);
         if (before == null || after == null || after.length() == 0) {
             return;
         }
-        final int beforeLength = WordFilter.trailingWordLength(before);
-        final int afterLength = WordFilter.leadingWordLength(after);
-        // A run that fills the window may go on beyond it: do not judge a word by a piece of it.
-        if ((beforeLength == before.length() && before.length() >= window)
-                || (afterLength == after.length() && after.length() >= window)) {
-            return;
-        }
-        final WordFilter.Hit hit = filter.blockedAround(
-                before.subSequence(before.length() - beforeLength, before.length()),
-                after.subSequence(0, afterLength));
+        // A word cut by the far edge of the window may go on beyond it: do not judge a word by a
+        // piece of it.
+        final WordFilter.Hit hit = filter.blockedAround(before,
+                after.length() >= window ? WordFilter.dropPartialEnd(after) : after);
         if (hit == null) {
             return;
         }
@@ -321,8 +314,8 @@ public final class WordBlockController {
             }
             final WordFilter filter = getStore().getFilter();
             final int window = windowFor(filter);
-            final CharSequence run = trailingWord(mConnection.getTextBeforeCursor(window), window);
-            final int length = run == null ? 0 : filter.blockedLength(run);
+            final int length = filter.blockedLengthBefore(
+                    wholeWordsOnly(mConnection.getTextBeforeCursor(window), window));
             if (length > 0) {
                 deleteNow(length);
             }
@@ -344,19 +337,13 @@ public final class WordBlockController {
     }
 
     /**
-     * @return the run of word characters at the end of {@code text} (an underscore counts as one),
-     * or null if there is none or it may have been cut off by the edge of the window.
+     * @return the text read back from before the cursor, minus a first word that the far edge of
+     * the window may have cut in two (null if the editor returned nothing). Text shorter than the
+     * window starts where the field does, so its first word is whole.
      */
-    private static CharSequence trailingWord(final CharSequence text, final int window) {
-        if (text == null) {
-            return null;
-        }
-        final int length = WordFilter.trailingWordLength(text);
-        final int available = text.length();
-        if (length == 0 || (length == available && available >= window)) {
-            return null;
-        }
-        return text.subSequence(available - length, available);
+    private static CharSequence wholeWordsOnly(final CharSequence before, final int window) {
+        return before != null && before.length() >= window ? WordFilter.dropPartialStart(before)
+                : before;
     }
 
     /** Deletes text before the cursor in a batch edit that is left open on success. */

@@ -378,7 +378,7 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     }
 
     private void addEntry(final String rawEntry) {
-        final String entry = rawEntry.trim();
+        final String entry = WordFilter.tidyEntry(rawEntry);
         if (entry.isEmpty()) {
             return;
         }

@@ -113,7 +113,7 @@ public final class BlockedWordStore {
         if (!mGate.canModifyFilterSettings()) {
             return false;
         }
-        final int index = indexOf(mEntries, entry == null ? "" : entry.trim());
+        final int index = indexOf(mEntries, entry == null ? "" : WordFilter.tidyEntry(entry));
         if (index < 0) {
             return false;
         }
@@ -131,12 +131,15 @@ public final class BlockedWordStore {
         return true;
     }
 
-    /** @return the trimmed entry, or null if it is not usable. */
+    /**
+     * @return the entry with its whitespace tidied (so {@code two  words} and {@code two words} are
+     * one entry), or null if it is not usable.
+     */
     private static String clean(final String rawEntry) {
         if (rawEntry == null) {
             return null;
         }
-        final String entry = rawEntry.trim();
+        final String entry = WordFilter.tidyEntry(rawEntry);
         if (entry.isEmpty() || entry.length() > MAX_ENTRY_LENGTH || !WordFilter.isValidEntry(entry)) {
             return null;
         }

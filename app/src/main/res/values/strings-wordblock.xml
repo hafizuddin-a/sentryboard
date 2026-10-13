@@ -87,15 +87,15 @@
     <string name="protection_disable_message" translatable="false">Deactivating this lets Sentryboard be uninstalled.</string>
     <string name="wordblock_list_category" translatable="false">Blocked words</string>
     <string name="wordblock_add" translatable="false">Add a word</string>
-    <string name="wordblock_syntax_summary" translatable="false">word blocks that word only. word* also blocks longer words that start with it. word! blocks it and removes it the moment it is typed.</string>
+    <string name="wordblock_syntax_summary" translatable="false">word blocks that word only. Several words, like two words, block that phrase. word* also blocks longer words that start with it. word! blocks it and removes it the moment it is typed.</string>
     <string name="wordblock_empty" translatable="false">No blocked words yet</string>
     <string name="wordblock_locked" translatable="false">Editing the list is locked</string>
     <string name="wordblock_add_title" translatable="false">Add a blocked word</string>
-    <string name="wordblock_add_hint" translatable="false">word, word* or word!</string>
+    <string name="wordblock_add_hint" translatable="false">word, two words, word* or word!</string>
     <string name="wordblock_add_confirm" translatable="false">Add</string>
     <string name="wordblock_remove_title" translatable="false">Remove from list?</string>
     <string name="wordblock_remove_confirm" translatable="false">Remove</string>
-    <string name="wordblock_invalid" translatable="false">Use one word made of letters, digits, apostrophes and underscores, optionally ending in * or !</string>
+    <string name="wordblock_invalid" translatable="false">Use letters, digits, \' and _, with spaces between words</string>
     <string name="wordblock_duplicate" translatable="false">That word is already on the list</string>
     <plurals name="wordblock_list_hidden" translatable="false">
         <item quantity="one">%d blocked word</item>
