@@ -8,6 +8,5 @@ Android Open Source Project (AOSP) LatinIME keyboard
 Both upstream projects are licensed under the Apache License, Version 2.0.
 The full license text is in the LICENSE file. The copyright notices of the
 upstream authors and contributors are retained unchanged in the header of
-each source file. Modifications made by this fork are described in the
-"Sentryboard" section of README.md and recorded in this repository's commit
-history.
+each source file. Modifications made by this fork are described in README.md and recorded
+in this repository's commit history.

@@ -1,263 +1,161 @@
-# Sentryboard
+<p align="center">
+  <img src="assets/logo.png" alt="Sentryboard logo" width="200">
+</p>
 
-Sentryboard is a modified fork of [Simple Keyboard](https://github.com/rkkr/simple-keyboard),
-which is itself based on AOSP LatinIME. It keeps Simple Keyboard's small size and adds three things:
+<h1 align="center">Sentryboard</h1>
 
-1. **A word filter**: words on a list you choose are deleted from the text field as you type them.
-2. **A settings lock**: the filter's settings can be locked so that changing them means waiting out
-   a countdown.
-3. **Uninstall protection**: an optional device admin, which makes Android refuse to uninstall the
-   app until the admin is deactivated first.
+<p align="center">
+  An Android keyboard that deletes the words you choose the moment you finish typing them.
+</p>
 
-There is no network access (there is no `INTERNET` permission), no analytics, and no accounts. Beyond
-Simple Keyboard's `VIBRATE`, the only thing it asks for is the optional device admin (see
-[Permissions](#permissions)). This is a self-imposed friction tool for a phone you own, not a security
-product: see [Known limitations](#known-limitations) for what it cannot stop.
+<p align="center">
+  <a href="../../releases/latest"><b>Download</b></a> ·
+  <a href="#install"><b>Install</b></a> ·
+  <a href="#use"><b>Use</b></a> ·
+  <a href="LICENSE"><b>Apache 2.0 License</b></a>
+</p>
 
-Licensed under Apache License 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE). Everything below the
-next horizontal rule is upstream's README, unchanged.
+<br>
 
-## What it does
+Sentryboard is the Android counterpart of [WordBlock](https://github.com/hafizuddin-a/wordblock-mac), a Mac
+program that does the same thing: a small, self-imposed friction tool for a phone you own. It is a fork of
+[Simple Keyboard](https://github.com/rkkr/simple-keyboard), so it keeps that keyboard's small size.
 
-When you finish a word by typing a space, punctuation or Enter (including Enter as Send / Go / Next),
-Sentryboard checks the word immediately before the cursor (and the words before it, for a phrase)
-against your list. If it is on the list, the word or phrase is deleted and the separator you typed is inserted as usual. There is no toast or dialog.
+- Whole-word matching that ignores case, accents and apostrophes, and catches letter swaps (`sh@t`, `h3ll`).
+  Words and **phrases** (`hello world`) both work.
+- A **settings lock**: once locked, adding words is instant but removing them, switching the filter off or
+  changing the delay needs a countdown (you choose how long). While locked, the settings screen shows only
+  how many words there are, not which; they come back when you unlock.
+- Optional **uninstall protection**: Android will not uninstall the app until you switch it off first.
+- No network access (there is no `INTERNET` permission), no account, no analytics.
 
-Editing a word that is already finished is covered too. Whenever there is text after the cursor, the
-whole word around the cursor (the part before it and the part after it) is checked right after each
-key, so slipping a blocked word through by typing `helo`, a space, and then going back to add the
-missing `l` does not work. That includes adding or deleting a letter inside a word, adding one at the
-end of a word that is followed by a space, and splitting or joining words with a space.
+It only looks at the word you are typing right now. Nothing you type is saved, logged or sent anywhere, and
+your word list is never written to the log or to Android's cloud backup.
 
-Matching is by **whole word** and forgiving about disguise. Both the typed word and each list entry are
-normalized the same way before they are compared: accents are removed (`wórd` = `word`), case is
-ignored, apostrophes are ignored (`don't` = `dont`), and common leet substitutions are mapped
-(`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s), so `sh@t` is read as `shat`. A blocked `ass` never matches inside a
-longer word such as `class`, `assignment` or `pass`.
+Requires Android 7.0 or later.
 
-### Entry syntax
+## Install
 
-One entry per line in *Settings > Word filter*:
+1. On your phone, download `Sentryboard-1.0.0.apk` from the [Releases](../../releases) page.
+2. Open it. Android asks you to allow installs from the app you downloaded it with (your browser or Files):
+   allow it. Google Play Protect may say it has not seen the app before: tap **More details**, then
+   **Install anyway**. That is because the app is not on the Play Store, not because anything is wrong.
+3. Open **Sentryboard**. It tells you the keyboard is not enabled: tap **OK**, switch **Sentryboard** on, then
+   pick it as your keyboard (tap the keyboard icon at the bottom right of any keyboard, or choose it under
+   *Settings > System > Keyboard*).
+4. Open **Sentryboard > Word filter > Add a word** and add your first words.
+
+**Updating:** install a newer APK over the old one. Your list, lock and settings are kept, as long as it is
+signed with the same key (every release is). Do not uninstall first: that erases them.
+
+**Check the download:** the APK is signed with a key whose SHA-256 fingerprint is
+`9d:bf:4f:e2:12:32:e0:c0:64:3a:76:54:58:a7:34:12:0d:97:83:5b:89:a4:09:1c:96:36:a9:b2:db:5a:85:79`.
+You can see it with `apksigner verify --print-certs Sentryboard-1.0.0.apk`.
+
+Prefer to read the code first? It is all in this repository, and you can build it yourself (below).
+
+## Use
+
+Type a blocked word followed by a space, punctuation or Enter, and it disappears. Your words live in
+**Sentryboard > Word filter**, one entry per line:
 
 | Entry   | Meaning |
 |---------|---------|
-| `word`  | Blocks exactly that word. |
-| `word*` | Also blocks longer words that start with `word` (`words`, `wording`, but not `sword`). |
-| `word!` | Blocks exactly that word **and removes it the instant it is typed**, without waiting for a separator. Use it only for words that are not the start of harmless words: with `ass!`, typing `assess` deletes `ass` as soon as its third letter is typed. |
-| `two words` | Blocks that **phrase**: two or more words separated by spaces. See [Phrases](#phrases). |
+| `word`  | Blocked when you finish typing it |
+| `word*` | Also blocks longer words that start with it (`words`, `wording`, not `sword`) |
+| `word!` | Blocked the instant it is typed, without waiting for a separator |
+| `hello world` | A phrase of two or more words. The whole phrase is deleted when you finish its last word |
 
-An entry must be made of words of letters, digits, apostrophes, underscores, `@` and `$`, separated by
-spaces if there is more than one, optionally ending in `*` or `!`, with at least one letter or digit in
-every word. Anything else (hyphens, other punctuation) could never match what is typed and is rejected.
+Use `word!` only for words that are not the start of harmless words: with `ass!`, typing `assess` deletes
+`ass` as soon as its third letter is typed.
 
-### Phrases
+- **Disguises:** accents are removed, case and apostrophes are ignored, and common leet is read
+  (`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s). A blocked `ass` never matches inside `class`.
+- **Phrases:** any gap of up to 64 characters counts as the space between the words, so `hello  world`,
+  `hello, world`, `hello_world` and a line break all match `hello world`. `*` and `!` apply to the last word.
+- **Editing is covered:** adding the missing letter to `helo `, or putting a space into `helloworld`, after
+  the fact still gets the word or phrase deleted.
+- **Underscores** are part of a word, so `snake_case` is a single entry.
+- An entry is made of letters, digits, apostrophes, underscores, `@` and `$`, with spaces between the words
+  of a phrase. Password, number, phone and date fields are never touched.
 
-An entry of several words, such as `hello world`, blocks that phrase. When you finish its last word, the
-whole phrase is deleted together (including the spaces between the words), and what is around it stays.
-
-- **Any gap counts.** `hello  world` (two spaces), `hello, world`, `hello - world`, `hello_world` and a
-  line break between the words all match `hello world`. The gap can be up to 64 characters; longer than
-  that, the words are no longer treated as one phrase.
-- **Every word is matched whole and disguised the same way as a single word**: accents, case and leet
-  (`H3LLO w0rld`) do not get past it. `hello worlds`, `shello world` and `hello there world` are not
-  matches.
-- **`*` and `!` apply to the last word.** `hello wor*` also blocks `hello world` and `hello worldwide`;
-  `hello world!` deletes the phrase the moment its last letter is typed.
-- **Editing a finished phrase is caught too**, the same way as for single words (see
-  [What it does](#what-it-does)): adding the missing letter to `hello wrld`, deleting the extra one from
-  `hello worldx`, or putting a space into `helloworld`.
-- Underscores split the words of a phrase on both sides, so an entry of `snake_case other` is a phrase of
-  three words. A single entry with no spaces keeps its old meaning: `snake_case` is one word.
-
-Underscores are part of a word, so `snake_case` can be an entry and is matched as one word. They also
-mark a checkpoint: a blocked word right before an underscore (`word` in `word_list`) is still removed
-when you type the underscore, and only that word goes, so `my_word` becomes `my_`.
-
-### Settings
-
-- **Remove blocked words**: master switch.
-- **Remove after a pause** (off by default) and **Pause length** (250 ms to 2 s, default 500 ms): also
-  removes a blocked word if you stop typing for that long. See the Send-button gap below.
-- **Blocked words**: add and remove entries. The list lives in a private file in device-protected
-  storage and is excluded from Android's cloud backup and device-to-device transfer by the app's backup rules. Its contents are
-  never logged.
-
-Password fields (including "visible password" fields, which many terminal-style fields report), number,
-phone and date fields, and fields that declare no input type are never touched.
+Under **Remove after a pause** (off by default) a blocked word is also removed if you stop typing for a
+moment, which helps when you tap an app's own Send button without typing a separator.
 
 ## Settings lock
 
-Under *Settings > Word filter > Settings lock* you can lock the filter's settings for a chosen
-duration. While locked the blocked-word list is **hidden** (the screen shows only how many words there
-are) and you can still **add** words to it: adding can only make the filter stronger. Adding a word
-that is already on the list gets the same answer as adding a new one, so the screen does not tell you
-what is on the list. The words show again once you unlock. What is locked is **removing** words, the on/off switch, the pause
-options, and the lock itself (its length, and removing it). Keyboard settings such as theme and height
-are not affected.
+Under *Word filter > Settings lock* you can lock the filter's settings for a chosen time, from 1 minute to
+24 hours. While locked you can still **add** words (that can only make the filter stronger), but you cannot
+**remove** words, switch the filter off, change the pause options or change the lock itself, and the word list
+is **hidden**. To edit again, tap **Unlock** and stay on the full-screen countdown until it finishes.
 
-To edit again, tap **Unlock**. A full-screen page counts down the length you chose; you must stay on
-it until it finishes. Then the settings are editable until you leave the settings, or for 5 minutes,
-or until the phone restarts, whichever comes first.
-
-- The countdown is timed with the phone's monotonic clock, so changing the clock does not shorten it.
-- **Leaving the page resets it to zero**: Home, Recents, another app, the screen turning off, Back or
-  Cancel. Rotating the phone, changing the font size or switching dark mode do not.
-- The countdown is never saved. If the app is killed mid-countdown the lock simply stays on.
-- The lock's length is fixed while it is on. It can be changed only while the settings are unlocked,
-  and applies the next time you lock.
-- The lock is enforced in the screens **and** underneath them: removing from the word list and changing
-  the filter settings are refused while locked, whatever a screen does. If the saved lock state ever looks
-  corrupt, the lock is treated as **on** (with a 30 minute countdown).
-- Lengths from 1 minute to 24 hours (test builds also allow a few seconds, so the lock can be tried
-  without waiting).
+- Leaving the countdown page (Home, another app, screen off, Back) **resets it to zero**. Rotating the phone
+  does not.
+- Afterwards the settings are editable until you leave them, for 5 minutes, or until the phone restarts.
+- The countdown uses the phone's monotonic clock, so changing the clock does not shorten it.
+- The lock is enforced underneath the screens too, and a damaged lock state is treated as **locked**.
 
 ## Uninstall protection
 
-Under *Settings > Uninstall protection*. Android has exactly one hard rule for an ordinary app: **an
-active device admin cannot be uninstalled until it is deactivated first.** So Sentryboard can be a
-device admin, and that is all this feature is. It asks for **no** device policies: it cannot lock,
-wipe or control the phone.
+Under *Uninstall protection*. Android has one hard rule for an ordinary app: an active device admin cannot be
+uninstalled until it is deactivated first. So Sentryboard can be a device admin, and that is all this does. It
+asks for **no** device policies: it cannot lock, wipe or control your phone. Turning it off from the app needs
+the unlock countdown while the settings are locked.
 
-- **Enable uninstall protection** opens Android's screen that asks you to activate the admin.
-- **Remove uninstall protection** deactivates it, so the app can be uninstalled. While the settings
-  lock is on this needs the unlock countdown, like every other setting.
-- Android's own *Device admin apps* screen can also deactivate it directly, at any time. Since Android
-  7.1 the Uninstall button even takes you straight there. So this is a speed bump, not a lock.
+## What it can't do
 
-An earlier version also ran a background "guard" that covered Android's device-admin screen while the
-settings lock was on. It has been removed: it needed several extra permissions and it did not work on the
-phone it was tried on. The plain device admin is what remains.
+- It is friction, not a security boundary. Android's own *Device admin apps* screen can still switch
+  uninstall protection off, you can switch to another keyboard, and a factory reset or safe mode removes the
+  app. "Clear storage" wipes the lock and the list (the app still cannot be uninstalled).
+- Pasted text, voice input and text the app itself inserts are not filtered. The next key you press next to
+  the edited word checks it.
+- If you type a blocked word and tap an app's own Send button without a separator, a plain `word` entry may
+  not have been removed yet. Use `word!` entries or the pause option for that.
+- Hiding the list only hides it on the settings screen. You can still find out whether a word is on it by
+  typing it and seeing whether it is deleted.
+- A word with text after the cursor counts as finished, so typing a longer word in front of existing text can
+  delete a blocked start of it early (with `hello world` blocked, `hello worldwide` typed before an existing
+  space loses `hello world`).
+- It only works while Sentryboard is the active keyboard. English only: scripts that rely on combining marks
+  (Indic, Thai, Arabic vowel marks) are compared without them.
 
 ## Permissions
 
-`VIBRATE` is Simple Keyboard's and is unchanged. `INTERNET` is never requested.
+`VIBRATE` is Simple Keyboard's and is unchanged. `INTERNET` is never requested. The one extra thing is the
+optional device admin above (declared on the receiver; you activate it yourself, and it declares no policies).
+Not used, on purpose: accessibility services, Device Owner, overlays, hiding the app icon.
 
-| Access | Why | Needed for |
-|---|---|---|
-| Device admin (`BIND_DEVICE_ADMIN` on the receiver; you activate it yourself) | Makes Android require deactivation before uninstall. Declares no policies. | Uninstall protection |
+## Build from source
 
-Not used, on purpose: accessibility services, Device Owner or Profile Owner, any owner-only device
-policy API, wipe or password-reset policies, hiding the app icon, or obfuscation. The app also turns
-Android's automatic backup off and excludes everything from data extraction, so the lock and the list
-cannot be restored from an older copy.
+You need a JDK (17 or newer) and the Android SDK.
+
+```bash
+./gradlew assembleDebug                # app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:testDebugUnitTest       # unit tests (pure JVM, no phone needed)
+./gradlew assembleRelease              # signed only if you set up a key (below)
+```
+
+Upstream does not commit `gradle/wrapper/gradle-wrapper.jar`. If it is missing, open the project in Android
+Studio, or generate it once with `gradle wrapper --gradle-version 9.6.0`.
+
+A release build is signed if `~/.sentryboard-signing/keystore.properties` exists, with the keys `storeFile`,
+`storePassword`, `keyAlias` and `keyPassword` (see `app/build.gradle`), and left unsigned otherwise. An APK you
+sign with your own key will not install over one signed with mine: uninstall first, which erases your data.
+
+The application id is `com.example.sentryboard` (set in one place, `app/build.gradle`), so it installs alongside
+Simple Keyboard. The Java package is still `rkr.simplekeyboard.inputmethod` to keep the diff against upstream
+small.
 
 ## Removing everything
 
-1. Open *Settings > Word filter*, tap **Unlock** and wait for the countdown (skip this if the lock is off).
+1. Open *Word filter*, tap **Unlock** and wait for the countdown (skip this if the lock is off).
 2. Open *Uninstall protection* and tap **Remove uninstall protection**. (Or deactivate Sentryboard under
    Android's *Settings > Security > Device admin apps*.)
 3. Uninstall the app normally.
 
-If the app will not open, the Device admin screen route above still works, and so does safe mode or a
-factory reset. Turning the lock off does not delete your word list; uninstalling does.
+## Credits and license
 
-## Known limitations
-
-- **The Send-button gap.** If you type a blocked word and tap the *app's own* Send button, no separator
-  was typed, so a plain `word` entry has not been removed yet. Two mitigations:
-  `word!` entries are removed the moment they are typed, and the optional pause setting removes
-  a blocked word after a short idle. **A fast tap on Send can still get a plain entry through.** That is
-  expected and cannot be closed from inside a keyboard.
-- The pause setting can cut short a word you type slowly (if `ass` is blocked, pausing after `ass` in
-  the middle of typing `assassin` deletes `ass`). That is why it is off by default.
-- A word with text after the cursor counts as finished, so it is checked after every key. The
-  flip side: if you type a *longer* word in front of existing text and its first letters are a blocked
-  word, that blocked prefix is deleted early (with `hell` blocked, typing `hello` right before an
-  existing space deletes `hell` at the fourth letter). Typing at the very end of the text is not
-  affected, and neither are words that are not blocked.
-- Text edited by something other than the keyboard (pasting, dictation, the app itself) is not seen.
-  The edited word is only checked the next time you press a key next to it.
-- **Voice input and pasted text are not filtered.** A paste that starts with a separator does cause the
-  word typed just before it to be checked.
-- It only works while Sentryboard is the active keyboard.
-- Digits reach editors as asynchronous key events, so an `!` entry that *ends in a digit* (such as
-  `word123!`) is removed a fraction of a second (about 0.15 s) after the last digit rather than at the
-  very moment it is typed. Typing another key within that moment cancels the wait, but the word is
-  still removed when you type a separator.
-- Because normalization strips combining marks, a blocked word in a script that uses them heavily
-  (Indic scripts, Thai, Arabic vowel marks) is compared without those marks and can match other words
-  with the same base letters. Word boundaries in such scripts are also approximate, since combining
-  marks are not word characters.
-- `@` and `$` are word characters, so a disguised word like `sh@t` or `w$rd` is one word and is caught.
-  At the very start or end of a word they are ignored when matching, so `@word` and `word$` are still
-  caught. The flip side is that `me@word.com` is treated as the single word `me@word`, so `word` is not
-  caught inside an address.
-- A phrase is only caught while its words are typed in order and close together (a gap of at most 64
-  characters). Two blocked words far apart, or in the other order, are not a phrase.
-- As with single words, typing a *longer* phrase in front of existing text can delete a blocked
-  start of it early: with `hello world` blocked, typing `hello worldwide` right before an existing space
-  deletes `hello world` at the last letter of `world`.
-
-### Settings lock and uninstall protection
-
-- **Neither is a real security boundary.** A factory reset, safe mode, recovery mode or another device
-  can always remove the app.
-- **Uninstall protection can be switched off from Android's own Device admin screen** without going
-  through the app or its countdown.
-- **"Clear storage" gets around the lock.** Android lets you clear an app's storage even while it is an
-  active device admin (tested). That wipes the lock state and the word list. The device admin stays
-  active, so the app still cannot be uninstalled, but the lock and the list are gone.
-- The settings lock only covers this app's own settings. It does not stop you switching to a different
-  keyboard; a stronger lock would need Device Owner.
-- Adding a word is allowed while locked, on purpose; removing one is not.
-- Hiding the list only hides it on the settings screen. You can still find out whether a particular
-  word is on it by typing that word and seeing whether it is deleted.
-
-## Building
-
-You need a JDK (17 or newer) and the Android SDK.
-
-```
-./gradlew assembleDebug                 # app/build/outputs/apk/debug/app-debug.apk
-./gradlew :app:testDebugUnitTest        # unit tests (pure JVM; no phone needed)
-```
-
-A release build is signed if `~/.sentryboard-signing/keystore.properties` exists (see `app/build.gradle`), and left unsigned otherwise. Upstream does not commit `gradle/wrapper/gradle-wrapper.jar`. If it is missing, open the project in
-Android Studio, or generate it once with `gradle wrapper --gradle-version 9.6.0`.
-
-The application id is `com.example.sentryboard` (set in one place, `app/build.gradle`), so it installs
-alongside Simple Keyboard. The Java package is still `rkr.simplekeyboard.inputmethod` to keep the diff
-against upstream small.
-
----
-
-# Simple Keyboard
-
-[![Crowdin](https://d322cqt584bo4o.cloudfront.net/simple-keyboard/localized.svg)](https://crowdin.com/project/simple-keyboard)
-
-<img src="images/screenshot-0.png"
-      alt="closeup"
-      width="500"/>
-      
-## About
-
-Features:
-- Small size (<1MB)
-- Adjustable keyboard height for more screen space
-- Number row
-- Swipe space to move pointer
-- Delete swipe
-- Custom theme colors
-- Minimal permissions (only Vibrate)
-- Ads-free
-
-Feature it doesn't have and probably will never have:
-- Emojis
-- GIFs
-- Spell checker
-- Swipe typing
-
-## Downloads
-
-[<img src="https://f-droid.org/badge/get-it-on.png"
-      alt="Get it on F-Droid"
-      height="80">](https://f-droid.org/packages/rkr.simplekeyboard.inputmethod/)
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-      alt="Get it on Google Play"
-      height="80">](https://play.google.com/store/apps/details?id=rkr.simplekeyboard.inputmethod)
-
-## Credits
-
-Licensed under Apache License Version 2
-
-This keyboard is based on AOSP LatinIME keyboard. You can get the original source code in https://android.googlesource.com/platform/packages/inputmethods/LatinIME/
+Sentryboard is a modified fork of [Simple Keyboard](https://github.com/rkkr/simple-keyboard) by Raimondas
+Rimkus, which is based on the AOSP LatinIME keyboard. Everything is licensed under the
+[Apache License 2.0](LICENSE); see [NOTICE](NOTICE) for what was changed. The privacy statement is in
+[PRIVACY.md](PRIVACY.md).
