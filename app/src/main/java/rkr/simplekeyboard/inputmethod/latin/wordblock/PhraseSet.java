@@ -86,10 +86,15 @@ final class PhraseSet {
      * several match, the longest.
      */
     int lengthBefore(final CharSequence text, final boolean instantOnly) {
+        return Math.max(lengthBefore(text, instantOnly, false), lengthBefore(text, instantOnly, true));
+    }
+
+    private int lengthBefore(final CharSequence text, final boolean instantOnly,
+            final boolean formatAsGap) {
         if (mPhrases.isEmpty() || text == null) {
             return 0;
         }
-        final Tokens tokens = new Tokens(text);
+        final Tokens tokens = new Tokens(text, formatAsGap);
         final int count = tokens.count();
         if (count < 2 || tokens.end(count - 1) != text.length()) {
             return 0;
@@ -118,10 +123,12 @@ final class PhraseSet {
             return null;
         }
         final int cursor = before.length();
-        final Tokens tokens = new Tokens(new StringBuilder(cursor + after.length())
-                .append(before).append(after));
+        final CharSequence text = new StringBuilder(cursor + after.length())
+                .append(before).append(after);
         int bestStart = -1;
         int bestEnd = -1;
+        for (final boolean formatAsGap : new boolean[] {false, true}) {
+        final Tokens tokens = new Tokens(text, formatAsGap);
         for (final Phrase phrase : mPhrases) {
             final int size = phrase.size();
             for (int first = 0; first + size <= tokens.count(); first++) {
@@ -139,6 +146,7 @@ final class PhraseSet {
                 }
             }
         }
+        }
         return bestStart < 0 ? null : new WordFilter.Hit(cursor - bestStart, bestEnd - cursor);
     }
 
@@ -147,12 +155,14 @@ final class PhraseSet {
         if (mPhrases.isEmpty() || text == null) {
             return;
         }
-        final Tokens tokens = new Tokens(text);
-        for (final Phrase phrase : mPhrases) {
-            final int size = phrase.size();
-            for (int first = 0; first + size <= tokens.count(); first++) {
-                if (tokens.adjacent(first, size) && phrase.matches(tokens, first)) {
-                    out.add(new int[] {tokens.start(first), tokens.end(first + size - 1)});
+        for (final boolean formatAsGap : new boolean[] {false, true}) {
+            final Tokens tokens = new Tokens(text, formatAsGap);
+            for (final Phrase phrase : mPhrases) {
+                final int size = phrase.size();
+                for (int first = 0; first + size <= tokens.count(); first++) {
+                    if (tokens.adjacent(first, size) && phrase.matches(tokens, first)) {
+                        out.add(new int[] {tokens.start(first), tokens.end(first + size - 1)});
+                    }
                 }
             }
         }
@@ -160,12 +170,20 @@ final class PhraseSet {
 
     /** The tokens of a text, as [start, end) pairs, with their readings worked out on demand. */
     static List<int[]> tokenSpans(final CharSequence text) {
+        return tokenSpans(text, false);
+    }
+
+    /**
+     * @param formatAsGap whether a format character such as a zero width space ends a token. It
+     * is tried both ways: it may sit inside a word to hide it, or between two words as a separator.
+     */
+    static List<int[]> tokenSpans(final CharSequence text, final boolean formatAsGap) {
         final List<int[]> spans = new ArrayList<>();
         final int length = text.length();
         int i = 0;
         while (i < length) {
             int codePoint = Character.codePointAt(text, i);
-            if (!isTokenCodePoint(codePoint)) {
+            if (!isTokenCodePoint(codePoint, formatAsGap)) {
                 i += Character.charCount(codePoint);
                 continue;
             }
@@ -173,7 +191,7 @@ final class PhraseSet {
             boolean hasLetterOrDigit = false;
             while (i < length) {
                 codePoint = Character.codePointAt(text, i);
-                if (!isTokenCodePoint(codePoint)) {
+                if (!isTokenCodePoint(codePoint, formatAsGap)) {
                     break;
                 }
                 hasLetterOrDigit |= Character.isLetterOrDigit(codePoint);
@@ -186,8 +204,9 @@ final class PhraseSet {
         return spans;
     }
 
-    private static boolean isTokenCodePoint(final int codePoint) {
-        return codePoint != '_' && WordFilter.isWordCodePoint(codePoint);
+    private static boolean isTokenCodePoint(final int codePoint, final boolean formatAsGap) {
+        return codePoint != '_' && WordFilter.isWordCodePoint(codePoint)
+                && !(formatAsGap && WordFilter.isFormatCharacter(codePoint));
     }
 
     private static final class Tokens {
@@ -195,9 +214,9 @@ final class PhraseSet {
         private final List<int[]> mSpans;
         private final List<Set<String>> mReadings;
 
-        Tokens(final CharSequence text) {
+        Tokens(final CharSequence text, final boolean formatAsGap) {
             mText = text;
-            mSpans = tokenSpans(text);
+            mSpans = tokenSpans(text, formatAsGap);
             mReadings = new ArrayList<>(mSpans.size());
             for (int i = 0; i < mSpans.size(); i++) {
                 mReadings.add(null);

@@ -36,7 +36,7 @@ Requires Android 7.0 or later.
 
 ## Install
 
-1. On your phone, download `Sentryboard-1.1.0.apk` from the [Releases](../../releases) page.
+1. On your phone, download `Sentryboard-1.1.1.apk` from the [Releases](../../releases) page.
 2. Open it. Android asks you to allow installs from the app you downloaded it with (your browser or Files):
    allow it. Google Play Protect may say it has not seen the app before: tap **More details**, then
    **Install anyway**. That is because the app is not on the Play Store, not because anything is wrong.
@@ -50,7 +50,7 @@ signed with the same key (every release is). Do not uninstall first: that erases
 
 **Check the download:** the APK is signed with a key whose SHA-256 fingerprint is
 `9d:bf:4f:e2:12:32:e0:c0:64:3a:76:54:58:a7:34:12:0d:97:83:5b:89:a4:09:1c:96:36:a9:b2:db:5a:85:79`.
-You can see it with `apksigner verify --print-certs Sentryboard-1.1.0.apk`.
+You can see it with `apksigner verify --print-certs Sentryboard-1.1.1.apk`.
 
 Prefer to read the code first? It is all in this repository, and you can build it yourself (below).
 
@@ -70,7 +70,10 @@ Use `word!` only for words that are not the start of harmless words: with `ass!`
 `ass` as soon as its third letter is typed.
 
 - **Disguises:** accents are removed, case and apostrophes are ignored, and common leet is read
-  (`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s). A blocked `ass` never matches inside `class`.
+  (`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s). Invisible characters put inside a word
+  (zero-width spaces and joiners, soft hyphens, an accent written as a separate character) are ignored, and
+  common Cyrillic and Greek lookalike letters are read as the Latin letter they resemble (`hеllo` with a
+  Cyrillic `е` is `hello`). A blocked `ass` never matches inside `class`.
 - **Phrases:** any gap of up to 64 characters counts as the space between the words, so `hello  world`,
   `hello, world`, `hello_world` and a line break all match `hello world`. `*` and `!` apply to the last word.
 - **Pasting is covered:** a blocked word or phrase in pasted text is removed from it (see
@@ -124,8 +127,11 @@ the unlock countdown while the settings are locked.
 - A word with text after the cursor counts as finished, so typing a longer word in front of existing text can
   delete a blocked start of it early (with `hello world` blocked, `hello worldwide` typed before an existing
   space loses `hello world`).
-- It only works while Sentryboard is the active keyboard. English only: scripts that rely on combining marks
-  (Indic, Thai, Arabic vowel marks) are compared without them.
+- It only works while Sentryboard is the active keyboard. English only: in other scripts, accents and marks
+  are compared without, so a blocked word can match other words with the same base letters.
+- Still not matched: letters repeated or separated (`heeello`, `h e l l o`, `h.e.l.l.o`, `hel-lo`, `hel_lo`),
+  an emoji in the middle of a word, circled letters, and lookalike letters beyond the common Cyrillic and
+  Greek ones.
 
 ## Permissions
 

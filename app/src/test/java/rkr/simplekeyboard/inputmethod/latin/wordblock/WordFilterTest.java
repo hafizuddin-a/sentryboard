@@ -813,7 +813,7 @@ public class WordFilterTest {
     @Test
     public void tidyEntryCollapsesWhitespace() {
         assertEquals("two words", WordFilter.tidyEntry("  two \t  words\n"));
-        assertEquals("two words", WordFilter.tidyEntry("two words"));
+        assertEquals("two words", WordFilter.tidyEntry("two\u00a0words"));
         assertEquals("word", WordFilter.tidyEntry(" word "));
         assertEquals("", WordFilter.tidyEntry("   "));
         assertEquals(null, WordFilter.tidyEntry(null));
@@ -847,7 +847,7 @@ public class WordFilterTest {
         final WordFilter filter = filterOf("hello world");
         final String[] texts = {"hello  world", "hello, world", "hello\nworld", "hello_world",
                 "hello - world", "hello ... world", "hello@ world", "hello @ world",
-                "hello\t\tworld", "hello — world"};
+                "hello\t\tworld", "hello \u2014 world"};
         for (final String text : texts) {
             assertEquals(text, text.length(), filter.blockedLengthBefore(text));
         }
@@ -866,11 +866,11 @@ public class WordFilterTest {
     public void phraseWordsAreNormalizedLikeSingleWords() {
         final WordFilter filter = filterOf("hello world");
         assertEquals(11, filter.blockedLengthBefore("H3LLO w0rld"));
-        assertEquals(11, filter.blockedLengthBefore("héllo wörld"));
+        assertEquals(11, filter.blockedLengthBefore("h\u00e9llo w\u00f6rld"));
         assertEquals(13, filter.blockedLengthBefore("@hello world$"));
         assertEquals(7, filterOf("don't be").blockedLengthBefore("dont be"));
         assertEquals(8, filterOf("don't be").blockedLengthBefore("don't be"));
-        assertEquals(11, filterOf("héllo w0rld").blockedLengthBefore("hello world"));
+        assertEquals(11, filterOf("h\u00e9llo w0rld").blockedLengthBefore("hello world"));
     }
 
     @Test
@@ -1083,5 +1083,86 @@ public class WordFilterTest {
             run.append("a_");
         }
         assertEquals(0, filterOf("kill").blockedSpans(run).size());
+    }
+
+    // --- invisible characters and lookalike letters ---
+
+    @Test
+    public void invisibleCharactersInsideAWordDoNotHideIt() {
+        final WordFilter filter = filterOf("hello");
+        final String[] disguised = {"he\u0301llo", "hel\u200blo", "hel\u200dlo", "hel\u200clo", "hel\u00adlo",
+                "\u200ehello", "hello\u200b", "h\u200be\u200bl\u200bl\u200bo", "hel\ufeff" + "lo"};
+        for (final String text : disguised) {
+            assertEquals(text, text.length(), filter.blockedLengthBefore(text));
+            assertEquals(text, text.length(), filter.blockedLengthBefore("say " + text));
+            assertEquals(text, 1, filter.blockedSpans("say " + text + " now").size());
+        }
+        assertTrue(filter.isBlocked("hel\u200blo"));
+        assertEquals(0, filter.blockedLengthBefore("hel\u200b lo"));
+    }
+
+    @Test
+    public void invisibleCharactersCountAsPartOfTheWord() {
+        assertTrue(WordFilter.isWordCodePoint(0x0301));
+        assertTrue(WordFilter.isWordCodePoint(0x200b));
+        assertTrue(WordFilter.isWordCodePoint(0x00ad));
+        assertEquals(6, WordFilter.trailingWordLength("a hel\u200blo"));
+        assertEquals(6, WordFilter.leadingWordLength("hel\u200blo b"));
+    }
+
+    @Test
+    public void blockedAroundSeesThroughInvisibleCharacters() {
+        final WordFilter filter = filterOf("hello");
+        assertHit(5, 1, filter.blockedAround("hel\u200bl", "o"));
+        assertHit(3, 3, filter.blockedAround("hel", "\u200blo"));
+    }
+
+    @Test
+    public void lookalikeLettersFromOtherAlphabetsAreRead() {
+        final WordFilter filter = filterOf("hello", "kill*");
+        assertEquals(5, filter.blockedLengthBefore("h\u0435llo")); // Cyrillic e
+        assertEquals(5, filter.blockedLengthBefore("hell\u043e")); // Cyrillic o
+        assertEquals(5, filter.blockedLengthBefore("hell\u03bf")); // Greek omicron
+        assertEquals(5, filter.blockedLengthBefore("H\u0415LLO")); // Cyrillic capital Ie
+        assertEquals(6, filter.blockedLengthBefore("k\u0456ller"));
+        assertEquals(5, filter.blockedLengthBefore("h\u0435ll\u043e"));
+        assertEquals(1, filter.blockedSpans("say h\u0435llo").size());
+    }
+
+    @Test
+    public void anEntryWrittenWithLookalikesStillMatchesItself() {
+        final WordFilter filter = filterOf("h\u0435llo");
+        assertEquals(5, filter.blockedLengthBefore("h\u0435llo"));
+        assertEquals(5, filter.blockedLengthBefore("hello"));
+    }
+
+    @Test
+    public void realWordsInOtherAlphabetsAreNotMistakenForEnglishOnes() {
+        final WordFilter filter = filterOf("hello", "pop", "kill");
+        // Russian, Greek and Hebrew words that are not made only of lookalike letters.
+        assertEquals(0, filter.blockedLengthBefore("\u043f\u0440\u0438\u0432\u0435\u0442"));
+        assertEquals(0, filter.blockedLengthBefore("\u03ba\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1"));
+        assertEquals(0, filter.blockedLengthBefore("\u05e9\u05dc\u05d5\u05dd"));
+        assertEquals(0, filter.blockedSpans("\u043c\u043e\u0441\u043a\u0432\u0430 \u043c\u0438\u0440").size());
+    }
+
+    @Test
+    public void phrasesSeeThroughInvisibleCharactersInsideAndBetweenWords() {
+        final WordFilter filter = filterOf("hello world");
+        assertEquals(12, filter.blockedLengthBefore("hel\u200blo world"));
+        assertEquals(12, filter.blockedLengthBefore("hello wor\u200bld"));
+        assertEquals(11, filter.blockedLengthBefore("hello\u200bworld"));
+        assertEquals(12, filter.blockedLengthBefore("hello\u200b\u200bworld"));
+        assertEquals(1, filter.blockedSpans("say hello\u200bworld now").size());
+        assertEquals(1, filter.blockedSpans("say hel\u200blo world now").size());
+        assertHit(10, 1, filter.blockedAround("hello\u200bworl", "d"));
+        assertHit(5, 6, filter.blockedAround("hello", "\u200bworld"));
+        assertEquals(0, filter.blockedLengthBefore("hello there world"));
+    }
+
+    @Test
+    public void lookalikesWorkInPhrasesAndWildcards() {
+        assertEquals(11, filterOf("hello world").blockedLengthBefore("h\u0435llo w\u043erld"));
+        assertEquals(15, filterOf("hello wor*").blockedLengthBefore("hello w\u043erldwide"));
     }
 }

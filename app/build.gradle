@@ -27,8 +27,8 @@ android {
         compileSdk 37
         minSdkVersion 24
         targetSdkVersion 37
-        versionCode 150
-        versionName "1.1.0"
+        versionCode 151
+        versionName "1.1.1"
     }
     buildTypes {
         release {

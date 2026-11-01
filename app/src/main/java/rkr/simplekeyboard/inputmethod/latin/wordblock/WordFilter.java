@@ -54,7 +54,7 @@ public final class WordFilter {
     /** Upper bound on the number of leet variants generated for one word. */
     static final int MAX_VARIANTS = 8;
 
-    private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{M}+");
+    private static final Pattern COMBINING_MARKS = Pattern.compile("[\\p{M}\\p{Cf}]+");
 
     private final Set<String> mWholeWords = new HashSet<>();
     private final Set<String> mInstantWords = new HashSet<>();
@@ -503,7 +503,29 @@ public final class WordFilter {
      */
     public static boolean isWordCodePoint(final int codePoint) {
         return Character.isLetterOrDigit(codePoint) || codePoint == '\'' || codePoint == '\u2019'
-                || codePoint == '_' || isLeetSymbol(codePoint);
+                || codePoint == '_' || isLeetSymbol(codePoint) || isInvisibleInWord(codePoint);
+    }
+
+    /**
+     * Combining marks (an accent written as a character of its own) and format characters (zero
+     * width space and joiner, soft hyphen, direction marks) have no width of their own. They count as
+     * part of a word and are ignored when comparing, so putting one inside a word does not hide it.
+     */
+    static boolean isInvisibleInWord(final int codePoint) {
+        switch (Character.getType(codePoint)) {
+            case Character.NON_SPACING_MARK:
+            case Character.ENCLOSING_MARK:
+            case Character.COMBINING_SPACING_MARK:
+            case Character.FORMAT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** True for a format character such as a zero width space (see {@link #isInvisibleInWord}). */
+    static boolean isFormatCharacter(final int codePoint) {
+        return Character.getType(codePoint) == Character.FORMAT;
     }
 
     /**
@@ -619,6 +641,49 @@ public final class WordFilter {
             case '7': return 't';
             case '@': return 'a';
             case '$': return 's';
+            default: return lookalike(codePoint);
+        }
+    }
+
+    /**
+     * Letters of other alphabets that are drawn like a Latin letter, read as that letter, so that
+     * a Cyrillic {@code e} in {@code hello} does not hide it. Applied to entries as well, so an
+     * entry written in one of these alphabets still matches itself.
+     */
+    private static int lookalike(final int codePoint) {
+        switch (codePoint) {
+            // Cyrillic
+            case '\u0430': return 'a';
+            case '\u0435': return 'e';
+            case '\u043e': return 'o';
+            case '\u0440': return 'p';
+            case '\u0441': return 'c';
+            case '\u0445': return 'x';
+            case '\u0443': return 'y';
+            case '\u0456': return 'i';
+            case '\u0458': return 'j';
+            case '\u0455': return 's';
+            case '\u043a': return 'k';
+            case '\u04bb': return 'h';
+            case '\u04cf': return 'l';
+            case '\u0501': return 'd';
+            case '\u051b': return 'q';
+            case '\u051d': return 'w';
+            // Greek
+            case '\u03bf': return 'o';
+            case '\u03b1': return 'a';
+            case '\u03bd': return 'v';
+            case '\u03c1': return 'p';
+            case '\u03b9': return 'i';
+            case '\u03ba': return 'k';
+            case '\u03c5': return 'u';
+            case '\u03c7': return 'x';
+            case '\u03b5': return 'e';
+            case '\u03f2': return 'c';
+            // Latin letters that NFKD leaves alone
+            case '\u0131': return 'i';
+            case '\u0251': return 'a';
+            case '\u0261': return 'g';
             default: return codePoint;
         }
     }
