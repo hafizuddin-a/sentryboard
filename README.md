@@ -36,7 +36,7 @@ Requires Android 7.0 or later.
 
 ## Install
 
-1. On your phone, download `Sentryboard-1.0.0.apk` from the [Releases](../../releases) page.
+1. On your phone, download `Sentryboard-1.1.0.apk` from the [Releases](../../releases) page.
 2. Open it. Android asks you to allow installs from the app you downloaded it with (your browser or Files):
    allow it. Google Play Protect may say it has not seen the app before: tap **More details**, then
    **Install anyway**. That is because the app is not on the Play Store, not because anything is wrong.
@@ -50,7 +50,7 @@ signed with the same key (every release is). Do not uninstall first: that erases
 
 **Check the download:** the APK is signed with a key whose SHA-256 fingerprint is
 `9d:bf:4f:e2:12:32:e0:c0:64:3a:76:54:58:a7:34:12:0d:97:83:5b:89:a4:09:1c:96:36:a9:b2:db:5a:85:79`.
-You can see it with `apksigner verify --print-certs Sentryboard-1.0.0.apk`.
+You can see it with `apksigner verify --print-certs Sentryboard-1.1.0.apk`.
 
 Prefer to read the code first? It is all in this repository, and you can build it yourself (below).
 
