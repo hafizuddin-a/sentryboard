@@ -302,7 +302,8 @@ public final class WordBlockController {
      * To be called when the editor reports a new selection, before the local text cache is
      * reloaded. A paste (or autofill, or drag and drop) inserts text and moves the cursor to its end
      * without the keyboard having typed anything. That looks like this: the cursor is collapsed, it
-     * moved forward by two or more from where the keyboard had it, and the keyboard has not been
+     * moved forward from where the keyboard had it (even by one, as when a single letter is pasted),
+     * and the keyboard has not been
      * typing. A forward tap on the screen looks the same, and is treated the same: the text the
      * cursor moved over is scanned, and a blocked word in it is removed.
      *
@@ -319,7 +320,7 @@ public final class WordBlockController {
             // can have told the system about the new position already.
             final int from = expectedStart >= 0 ? expectedStart : oldSelStart;
             final int length = newSelStart - from;
-            if (newSelStart != newSelEnd || length < 2 || newSelStart == expectedStart
+            if (newSelStart != newSelEnd || length < 1 || newSelStart == expectedStart
                     || SystemClock.uptimeMillis() - mLastActivityMillis < OWN_EDIT_QUIET_MILLIS) {
                 return;
             }
