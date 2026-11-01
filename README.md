@@ -73,6 +73,8 @@ Use `word!` only for words that are not the start of harmless words: with `ass!`
   (`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s). A blocked `ass` never matches inside `class`.
 - **Phrases:** any gap of up to 64 characters counts as the space between the words, so `hello  world`,
   `hello, world`, `hello_world` and a line break all match `hello world`. `*` and `!` apply to the last word.
+- **Pasting is covered:** a blocked word or phrase in pasted text is removed from it (see
+  [What it can't do](#what-it-cant-do) for the limits).
 - **Editing is covered:** adding the missing letter to `helo `, or putting a space into `helloworld`, after
   the fact still gets the word or phrase deleted.
 - **Underscores** are part of a word, so `snake_case` is a single entry.
@@ -107,8 +109,12 @@ the unlock countdown while the settings are locked.
 - It is friction, not a security boundary. Android's own *Device admin apps* screen can still switch
   uninstall protection off, you can switch to another keyboard, and a factory reset or safe mode removes the
   app. "Clear storage" wipes the lock and the list (the app still cannot be uninstalled).
-- Pasted text, voice input and text the app itself inserts are not filtered. The next key you press next to
-  the edited word checks it.
+- Text pasted into a field is checked: the pasted text and the words at either end of it are scanned, and
+  only the blocked words and phrases are removed from it. The rest of the paste stays. This also covers
+  autofill and drag and drop. It works by noticing that text appeared that the keyboard did not type, so it
+  can miss a paste in an app that reports its cursor late or not at all, it only scans the first 4,000
+  characters of a very long paste, and the text it rewrites loses rich formatting such as bold. Voice input
+  through another keyboard is not seen.
 - If you type a blocked word and tap an app's own Send button without a separator, a plain `word` entry may
   not have been removed yet. Use `word!` entries or the pause option for that.
 - Hiding the list only hides it on the settings screen. You can still find out whether a word is on it by

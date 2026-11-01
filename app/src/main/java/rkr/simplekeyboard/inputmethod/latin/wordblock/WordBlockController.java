@@ -16,6 +16,7 @@ package rkr.simplekeyboard.inputmethod.latin.wordblock;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.inputmethod.EditorInfo;
 
@@ -38,6 +39,8 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
  * <li>After a pause in typing, if that optional setting is on: {@link #scheduleIdleRemoval}.</li>
  * <li>When the user edits a word that already has text after the cursor, which the three ways
  *     above never look at: {@link #afterEdit} checks the whole word around the cursor.</li>
+ * <li>When text appears that the keyboard did not type, such as a paste:
+ *     {@link #afterSelectionChange} checks the inserted text and the words at its edges.</li>
  * </ul>
  *
  * Nothing here may ever break typing: every entry point catches {@link RuntimeException}, logs
@@ -52,12 +55,17 @@ public final class WordBlockController {
     private static final int WINDOW_MARGIN = 8;
     // Long enough for a digit, which reaches the editor as an asynchronous key event, to arrive.
     private static final long SETTLE_MILLIS = 150;
+    // A cursor jump this soon after the keyboard last did something is the keyboard's own doing.
+    private static final long OWN_EDIT_QUIET_MILLIS = 400;
+    // The most pasted text that is scanned (the rest of a longer paste is left alone).
+    private static final int MAX_PASTE_SCAN = 4000;
 
     private final LatinIME mLatinIme;
     private final RichInputConnection mConnection;
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final Runnable mIdleRemoval = this::removeAfterIdle;
     private final Runnable mSettledCheck = this::checkAfterSettling;
+    private long mLastActivityMillis;
     // Resolved on first use: this object is created while the service is still being constructed
     // and has no base context yet.
     private BlockedWordStore mStore;
@@ -279,10 +287,133 @@ public final class WordBlockController {
         }
     }
 
+    // ---- After text appears that the keyboard did not type (a paste) --------------------------
+
+    /**
+     * To be called when the editor reports a new selection, before the local text cache is
+     * reloaded. A paste (or autofill, or drag and drop) inserts text and moves the cursor to its end
+     * without the keyboard having typed anything. That looks like this: the cursor is collapsed, it
+     * moved forward by two or more, it is not where the keyboard expected it, the keyboard has not
+     * been typing, and the text after the cursor is what it was before. A forward tap on the screen
+     * moves the cursor too, but it changes the text after it.
+     *
+     * When it looks like that, the inserted text and the whole words at either edge of it are
+     * read back, and the blocked words and phrases in it are removed.
+     *
+     * @param expectedStart where the keyboard thought the cursor was, before this update.
+     * @param cachedAfter the text after the cursor, as the keyboard last knew it.
+     */
+    public void afterSelectionChange(final int expectedStart, final int oldSelStart,
+            final int newSelStart, final int newSelEnd, final CharSequence cachedAfter) {
+        try {
+            final int length = newSelStart - oldSelStart;
+            if (newSelStart != newSelEnd || newSelStart == expectedStart || length < 2
+                    || SystemClock.uptimeMillis() - mLastActivityMillis < OWN_EDIT_QUIET_MILLIS) {
+                return;
+            }
+            final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+            final WordFilter filter = filterToCheckAfterInsert(settingsValues,
+                    mLatinIme.getCurrentInputEditorInfo());
+            if (filter == null) {
+                return;
+            }
+            final int window = windowFor(filter);
+            final CharSequence after = mConnection.getTextAfterCursor(window);
+            if (after == null || !sameStart(after, cachedAfter)) {
+                return; // The text after the cursor changed, so the cursor was moved, not text added.
+            }
+            removeFromInsertedText(filter, length, window, after);
+        } catch (RuntimeException e) {
+            logFailure(e);
+        }
+    }
+
+    private WordFilter filterToCheckAfterInsert(final SettingsValues settingsValues,
+            final EditorInfo editorInfo) {
+        if (!isActive(settingsValues, editorInfo)) {
+            return null;
+        }
+        final WordFilter filter = getStore().getFilter();
+        return filter.isEmpty() ? null : filter;
+    }
+
+    /** @return true if both texts start with the same (up to 32) chars, and are as long. */
+    private static boolean sameStart(final CharSequence live, final CharSequence cached) {
+        final int count = Math.min(32, Math.max(live.length(), cached.length()));
+        if (live.length() < count || cached.length() < count) {
+            return false;
+        }
+        for (int i = 0; i < count; i++) {
+            if (live.charAt(i) != cached.charAt(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void removeFromInsertedText(final WordFilter filter, final int insertedLength,
+            final int window, final CharSequence afterRead) {
+        final int scanned = Math.min(insertedLength, MAX_PASTE_SCAN);
+        final CharSequence beforeRead = mConnection.getTextBeforeCursor(scanned + window);
+        if (beforeRead == null) {
+            return;
+        }
+        // Words cut in half by the far edges of what was read are left out.
+        final CharSequence before = beforeRead.length() >= scanned + window
+                ? WordFilter.dropPartialStart(beforeRead) : beforeRead;
+        final CharSequence after = afterRead.length() >= window
+                ? WordFilter.dropPartialEnd(afterRead) : afterRead;
+        final int cursor = before.length();
+        final int insertedStart = Math.max(0, cursor - insertedLength);
+        final String text = new StringBuilder(cursor + after.length())
+                .append(before).append(after).toString();
+
+        // The blocked words that overlap the inserted text, which may reach into the words next to it.
+        final boolean[] removed = new boolean[text.length()];
+        int first = Integer.MAX_VALUE;
+        int last = -1;
+        for (final int[] span : filter.blockedSpans(text)) {
+            if (span[0] < cursor && span[1] > insertedStart) {
+                java.util.Arrays.fill(removed, span[0], span[1], true);
+                first = Math.min(first, span[0]);
+                last = Math.max(last, span[1]);
+            }
+        }
+        if (last < 0) {
+            return;
+        }
+        final StringBuilder keptBefore = new StringBuilder();
+        final StringBuilder keptAfter = new StringBuilder();
+        // Everything from the first blocked word to the cursor is deleted, so all of it that is not
+        // blocked has to be put back, not only what lies before the last blocked word.
+        for (int i = first; i < Math.max(last, cursor); i++) {
+            if (!removed[i]) {
+                (i < cursor ? keptBefore : keptAfter).append(text.charAt(i));
+            }
+        }
+        mConnection.beginBatchEdit();
+        try {
+            if (last > cursor) {
+                mConnection.deleteTextAfterCursor(last - cursor);
+            }
+            mConnection.deleteTextBeforeCursor(cursor - first);
+            if (keptBefore.length() > 0) {
+                mConnection.commitText(keptBefore, 1);
+            }
+            if (keptAfter.length() > 0) {
+                mConnection.commitText(keptAfter, 0); // 0: the cursor stays in front of it
+            }
+        } finally {
+            endBatch();
+            mLastActivityMillis = SystemClock.uptimeMillis();
+        }
+    }
+
     // ---- After a pause in typing (optional) ---------------------------------------------------
 
     /** To be called at the start of every keystroke: the user is not idle any more. */
     public void cancelIdleRemoval() {
+        mLastActivityMillis = SystemClock.uptimeMillis();
         mHandler.removeCallbacks(mIdleRemoval);
         mHandler.removeCallbacks(mSettledCheck);
     }

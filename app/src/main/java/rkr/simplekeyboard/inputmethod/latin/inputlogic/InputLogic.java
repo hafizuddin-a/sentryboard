@@ -119,8 +119,13 @@ public final class InputLogic {
      * @param newSelStart new selection start
      * @param newSelEnd new selection end
      */
-    public void onUpdateSelection(final int newSelStart, final int newSelEnd) {
+    public void onUpdateSelection(final int oldSelStart, final int newSelStart,
+            final int newSelEnd) {
+        final int expectedSelStart = mConnection.getExpectedSelectionStart();
+        final CharSequence cachedAfter = mConnection.getCachedTextAfterCursor(32);
         mConnection.updateSelection(newSelStart, newSelEnd);
+        mWordBlock.afterSelectionChange(expectedSelStart, oldSelStart, newSelStart, newSelEnd,
+                cachedAfter);
     }
 
     public void reloadTextCache() {

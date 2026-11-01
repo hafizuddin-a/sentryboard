@@ -510,7 +510,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         Log.i(TAG, "Update Selection. Cursor position = " + newSelStart + "," + newSelEnd);
 
-        mInputLogic.onUpdateSelection(newSelStart, newSelEnd);
+        mInputLogic.onUpdateSelection(oldSelStart, newSelStart, newSelEnd);
         if (isInputViewShown()) {
             mInputLogic.reloadTextCache();
 

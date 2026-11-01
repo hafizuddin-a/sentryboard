@@ -142,6 +142,22 @@ final class PhraseSet {
         return bestStart < 0 ? null : new WordFilter.Hit(cursor - bestStart, bestEnd - cursor);
     }
 
+    /** Adds the [start, end) span of every phrase found anywhere in the text to {@code out}. */
+    void spans(final CharSequence text, final List<int[]> out) {
+        if (mPhrases.isEmpty() || text == null) {
+            return;
+        }
+        final Tokens tokens = new Tokens(text);
+        for (final Phrase phrase : mPhrases) {
+            final int size = phrase.size();
+            for (int first = 0; first + size <= tokens.count(); first++) {
+                if (tokens.adjacent(first, size) && phrase.matches(tokens, first)) {
+                    out.add(new int[] {tokens.start(first), tokens.end(first + size - 1)});
+                }
+            }
+        }
+    }
+
     /** The tokens of a text, as [start, end) pairs, with their readings worked out on demand. */
     static List<int[]> tokenSpans(final CharSequence text) {
         final List<int[]> spans = new ArrayList<>();

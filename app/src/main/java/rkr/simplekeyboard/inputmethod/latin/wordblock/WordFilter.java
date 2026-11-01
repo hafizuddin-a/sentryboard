@@ -260,6 +260,84 @@ public final class WordFilter {
         return Math.max(word, mPhrases.lengthBefore(textBeforeCursor, true));
     }
 
+    /** The longest run of word characters that {@link #blockedSpans} looks into for words. */
+    private static final int MAX_SCANNED_RUN = 256;
+
+    /**
+     * Finds every blocked word and phrase in a block of text, such as text that was pasted. A word
+     * is judged as in {@link #blockedLength}: whole, and also as an underscore-bounded part of a run
+     * ({@code word} in {@code my_word_list}). Where matches overlap, the widest is kept.
+     *
+     * @return the [start, end) spans of the matches, in order and not overlapping. The text must
+     * not start or end in the middle of a word.
+     */
+    public List<int[]> blockedSpans(final CharSequence text) {
+        final List<int[]> found = new ArrayList<>();
+        if (isEmpty() || text == null) {
+            return found;
+        }
+        final int length = text.length();
+        int i = 0;
+        while (i < length) {
+            int codePoint = Character.codePointAt(text, i);
+            if (!isWordCodePoint(codePoint)) {
+                i += Character.charCount(codePoint);
+                continue;
+            }
+            final int start = i;
+            while (i < length && isWordCodePoint(Character.codePointAt(text, i))) {
+                i += Character.charCount(Character.codePointAt(text, i));
+            }
+            if (i - start <= MAX_SCANNED_RUN) {
+                addWordSpans(text.subSequence(start, i).toString(), start, found);
+            }
+        }
+        mPhrases.spans(text, found);
+
+        // Widest first, keeping a span only if it does not overlap one already kept.
+        found.sort((a, b) -> a[1] - a[0] != b[1] - b[0] ? (b[1] - b[0]) - (a[1] - a[0]) : a[0] - b[0]);
+        final List<int[]> kept = new ArrayList<>();
+        for (final int[] span : found) {
+            boolean overlaps = false;
+            for (final int[] other : kept) {
+                if (span[0] < other[1] && other[0] < span[1]) {
+                    overlaps = true;
+                    break;
+                }
+            }
+            if (!overlaps) {
+                kept.add(span);
+            }
+        }
+        kept.sort((a, b) -> a[0] - b[0]);
+        return kept;
+    }
+
+    private void addWordSpans(final String run, final int offset, final List<int[]> out) {
+        final List<Integer> starts = new ArrayList<>();
+        final List<Integer> ends = new ArrayList<>();
+        starts.add(0);
+        ends.add(run.length());
+        for (int i = 0; i < run.length(); i++) {
+            if (run.charAt(i) != '_') {
+                continue;
+            }
+            if (i + 1 < run.length()) {
+                starts.add(i + 1);
+            }
+            if (i > 0) {
+                ends.add(i);
+            }
+        }
+        for (final int start : starts) {
+            for (final int end : ends) {
+                if (end > start && isBlocked(run.substring(start, end))) {
+                    out.add(new int[] {offset + start, offset + end});
+                }
+            }
+        }
+    }
+
     /**
      * Drops the run of word characters at the start of text read back from the editor, which the
      * edge of the window may have cut in half. Only for text that fills its window: if the text

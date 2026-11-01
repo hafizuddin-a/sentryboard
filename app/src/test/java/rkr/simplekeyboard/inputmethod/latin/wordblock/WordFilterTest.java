@@ -1016,4 +1016,72 @@ public class WordFilterTest {
         assertEquals("abc ", WordFilter.dropPartialEnd("abc ").toString());
         assertEquals("", WordFilter.dropPartialEnd("").toString());
     }
+
+    // --- blockedSpans (text that was pasted) ---
+
+    private static String spansOf(final WordFilter filter, final String text) {
+        final StringBuilder sb = new StringBuilder();
+        for (final int[] span : filter.blockedSpans(text)) {
+            sb.append(sb.length() > 0 ? "|" : "").append(text, span[0], span[1]);
+        }
+        return sb.toString();
+    }
+
+    @Test
+    public void blockedSpansFindsEveryWordInAText() {
+        final WordFilter filter = filterOf("kill", "hello");
+        assertEquals("hello|kill|Kill", spansOf(filter, "say hello, then kill it. Kill!"));
+        assertEquals("", spansOf(filter, "nothing to see here"));
+        assertEquals("", spansOf(filter, "killer skills shello"));
+        assertEquals("", spansOf(filter, ""));
+        assertEquals("", spansOf(filter, null));
+        assertEquals("", spansOf(filterOf(), "kill"));
+    }
+
+    @Test
+    public void blockedSpansPositionsAreExact() {
+        final List<int[]> spans = filterOf("kill").blockedSpans("a kill b");
+        assertEquals(1, spans.size());
+        assertEquals(2, spans.get(0)[0]);
+        assertEquals(6, spans.get(0)[1]);
+    }
+
+    @Test
+    public void blockedSpansUsesDisguisesWildcardsAndUnderscores() {
+        final WordFilter filter = filterOf("kill", "hell*", "snake_case");
+        assertEquals("K1LL|hello", spansOf(filter, "a K1LL, hello"));
+        assertEquals("kill", spansOf(filter, "my_kill_list"));
+        assertEquals("snake_case", spansOf(filter, "x snake_case y"));
+        assertEquals("@kill", spansOf(filter, "hi @kill"));
+    }
+
+    @Test
+    public void blockedSpansFindsPhrasesAndPrefersTheWiderMatch() {
+        final WordFilter filter = filterOf("world", "hello world");
+        assertEquals("hello  world", spansOf(filter, "say hello  world now"));
+        assertEquals("world", spansOf(filter, "the world"));
+        assertEquals("hello world|hello, world", spansOf(filter, "hello world and hello, world"));
+    }
+
+    @Test
+    public void blockedSpansDoNotOverlap() {
+        final WordFilter filter = filterOf("one two", "two three");
+        final List<int[]> spans = filter.blockedSpans("one two three");
+        assertEquals(1, spans.size());
+        assertEquals(9, spans.get(0)[1] - spans.get(0)[0]);
+    }
+
+    @Test
+    public void blockedSpansCopesWithLongTexts() {
+        final StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 2000; i++) {
+            text.append("word").append(i).append(" kill ");
+        }
+        assertEquals(2000, filterOf("kill").blockedSpans(text).size());
+        final StringBuilder run = new StringBuilder();
+        for (int i = 0; i < 1000; i++) {
+            run.append("a_");
+        }
+        assertEquals(0, filterOf("kill").blockedSpans(run).size());
+    }
 }
