@@ -319,8 +319,14 @@ public final class WordBlockController {
             }
             final int window = windowFor(filter);
             final CharSequence after = mConnection.getTextAfterCursor(window);
-            if (after == null || !sameStart(after, cachedAfter)) {
-                return; // The text after the cursor changed, so the cursor was moved, not text added.
+            if (after == null) {
+                return;
+            }
+            // The text after the cursor changing means the cursor was moved, not text added. That
+            // can only be said if the keyboard knew that text: an app that restarts the input
+            // session without giving the keyboard the surrounding text leaves its copy empty.
+            if (cachedAfter.length() > 0 && !sameStart(after, cachedAfter)) {
+                return;
             }
             removeFromInsertedText(filter, length, window, after);
         } catch (RuntimeException e) {
