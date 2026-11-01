@@ -57,10 +57,11 @@ public final class WordBlockController {
     private static final long SETTLE_MILLIS = 150;
     // A cursor jump this soon after the keyboard last did something is the keyboard's own doing.
     private static final long OWN_EDIT_QUIET_MILLIS = 400;
-    // Apps such as Telegram swap the input connection right after a paste: read the text a moment
-    // later, and try a few times.
-    private static final long INSERT_SCAN_DELAY_MILLIS = 250;
-    private static final int INSERT_SCAN_ATTEMPTS = 4;
+    // Apps such as Telegram swap the input connection right after a paste (about 10 ms later) and
+    // return nothing until it is in place: read the text a moment later, and try again if needed.
+    private static final long INSERT_SCAN_FIRST_MILLIS = 50;
+    private static final long INSERT_SCAN_RETRY_MILLIS = 80;
+    private static final int INSERT_SCAN_ATTEMPTS = 8;
     // The most pasted text that is scanned (the rest of a longer paste is left alone).
     private static final int MAX_PASTE_SCAN = 4000;
 
@@ -326,7 +327,7 @@ public final class WordBlockController {
             mInsertedEnd = newSelStart;
             mScanAttempts = 0;
             mHandler.removeCallbacks(mInsertScan);
-            mHandler.postDelayed(mInsertScan, INSERT_SCAN_DELAY_MILLIS);
+            mHandler.postDelayed(mInsertScan, INSERT_SCAN_FIRST_MILLIS);
         } catch (RuntimeException e) {
             logFailure(e);
         }
@@ -344,10 +345,8 @@ public final class WordBlockController {
             final int window = windowFor(filter);
             final CharSequence after = mConnection.getTextAfterCursor(window);
             if (after == null || !removeFromInsertedText(filter, mInsertedLength, window, after)) {
-                // Numbers only, never text. TODO: remove once pasting is confirmed on a phone.
-                Log.w(TAG, "scan " + mScanAttempts + ": no text from the editor yet");
                 if (++mScanAttempts < INSERT_SCAN_ATTEMPTS) {
-                    mHandler.postDelayed(mInsertScan, INSERT_SCAN_DELAY_MILLIS);
+                    mHandler.postDelayed(mInsertScan, INSERT_SCAN_RETRY_MILLIS);
                 }
             }
         } catch (RuntimeException e) {
@@ -394,10 +393,8 @@ public final class WordBlockController {
             }
         }
         if (last < 0) {
-            Log.w(TAG, "scan: nothing blocked in " + text.length() + " chars read");
             return true;
         }
-        Log.w(TAG, "scan: removing " + (last - first) + " of " + text.length() + " chars read");
         final StringBuilder keptBefore = new StringBuilder();
         final StringBuilder keptAfter = new StringBuilder();
         // Everything from the first blocked word to the cursor is deleted, so all of it that is not
