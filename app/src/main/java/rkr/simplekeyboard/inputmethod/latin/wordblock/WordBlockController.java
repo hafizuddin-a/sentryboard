@@ -57,6 +57,10 @@ public final class WordBlockController {
     private static final long SETTLE_MILLIS = 150;
     // A cursor jump this soon after the keyboard last did something is the keyboard's own doing.
     private static final long OWN_EDIT_QUIET_MILLIS = 400;
+    // Apps such as Telegram swap the input connection right after a paste: read the text a moment
+    // later, and try a few times.
+    private static final long INSERT_SCAN_DELAY_MILLIS = 250;
+    private static final int INSERT_SCAN_ATTEMPTS = 4;
     // The most pasted text that is scanned (the rest of a longer paste is left alone).
     private static final int MAX_PASTE_SCAN = 4000;
 
@@ -66,6 +70,10 @@ public final class WordBlockController {
     private final Runnable mIdleRemoval = this::removeAfterIdle;
     private final Runnable mSettledCheck = this::checkAfterSettling;
     private long mLastActivityMillis;
+    private final Runnable mInsertScan = this::scanInsertedText;
+    private int mInsertedLength;
+    private int mInsertedEnd;
+    private int mScanAttempts;
     // Resolved on first use: this object is created while the service is still being constructed
     // and has no base context yet.
     private BlockedWordStore mStore;
@@ -293,42 +301,55 @@ public final class WordBlockController {
      * To be called when the editor reports a new selection, before the local text cache is
      * reloaded. A paste (or autofill, or drag and drop) inserts text and moves the cursor to its end
      * without the keyboard having typed anything. That looks like this: the cursor is collapsed, it
-     * moved forward by two or more, it is not where the keyboard expected it, the keyboard has not
-     * been typing, and the text after the cursor is what it was before. A forward tap on the screen
-     * moves the cursor too, but it changes the text after it.
+     * moved forward by two or more from where the keyboard had it, and the keyboard has not been
+     * typing. A forward tap on the screen looks the same, and is treated the same: the text the
+     * cursor moved over is scanned, and a blocked word in it is removed.
      *
-     * When it looks like that, the inserted text and the whole words at either edge of it are
-     * read back, and the blocked words and phrases in it are removed.
+     * The scan is done a moment later, because some apps replace the input connection right after
+     * a paste and refuse to hand out text until the new one is in place.
      *
      * @param expectedStart where the keyboard thought the cursor was, before this update.
-     * @param cachedAfter the text after the cursor, as the keyboard last knew it.
      */
     public void afterSelectionChange(final int expectedStart, final int oldSelStart,
-            final int newSelStart, final int newSelEnd, final CharSequence cachedAfter) {
+            final int newSelStart, final int newSelEnd) {
         try {
-            final int length = newSelStart - oldSelStart;
-            if (newSelStart != newSelEnd || newSelStart == expectedStart || length < 2
+            // Where the cursor was, by the keyboard's own tracking when it has one. The editor's
+            // "old" position is not reliable: an app that restarts the input session after a paste
+            // can have told the system about the new position already.
+            final int from = expectedStart >= 0 ? expectedStart : oldSelStart;
+            final int length = newSelStart - from;
+            if (newSelStart != newSelEnd || length < 2 || newSelStart == expectedStart
                     || SystemClock.uptimeMillis() - mLastActivityMillis < OWN_EDIT_QUIET_MILLIS) {
                 return;
             }
-            final SettingsValues settingsValues = Settings.getInstance().getCurrent();
-            final WordFilter filter = filterToCheckAfterInsert(settingsValues,
+            mInsertedLength = length;
+            mInsertedEnd = newSelStart;
+            mScanAttempts = 0;
+            mHandler.removeCallbacks(mInsertScan);
+            mHandler.postDelayed(mInsertScan, INSERT_SCAN_DELAY_MILLIS);
+        } catch (RuntimeException e) {
+            logFailure(e);
+        }
+    }
+
+    private void scanInsertedText() {
+        try {
+            final WordFilter filter = filterToCheckAfterInsert(Settings.getInstance().getCurrent(),
                     mLatinIme.getCurrentInputEditorInfo());
-            if (filter == null) {
+            // Not if the cursor has moved on, or something is selected, in the meantime.
+            if (filter == null || mConnection.hasSelection()
+                    || mConnection.getExpectedSelectionStart() != mInsertedEnd) {
                 return;
             }
             final int window = windowFor(filter);
             final CharSequence after = mConnection.getTextAfterCursor(window);
-            if (after == null) {
-                return;
+            if (after == null || !removeFromInsertedText(filter, mInsertedLength, window, after)) {
+                // Numbers only, never text. TODO: remove once pasting is confirmed on a phone.
+                Log.w(TAG, "scan " + mScanAttempts + ": no text from the editor yet");
+                if (++mScanAttempts < INSERT_SCAN_ATTEMPTS) {
+                    mHandler.postDelayed(mInsertScan, INSERT_SCAN_DELAY_MILLIS);
+                }
             }
-            // The text after the cursor changing means the cursor was moved, not text added. That
-            // can only be said if the keyboard knew that text: an app that restarts the input
-            // session without giving the keyboard the surrounding text leaves its copy empty.
-            if (cachedAfter.length() > 0 && !sameStart(after, cachedAfter)) {
-                return;
-            }
-            removeFromInsertedText(filter, length, window, after);
         } catch (RuntimeException e) {
             logFailure(e);
         }
@@ -343,26 +364,13 @@ public final class WordBlockController {
         return filter.isEmpty() ? null : filter;
     }
 
-    /** @return true if both texts start with the same (up to 32) chars, and are as long. */
-    private static boolean sameStart(final CharSequence live, final CharSequence cached) {
-        final int count = Math.min(32, Math.max(live.length(), cached.length()));
-        if (live.length() < count || cached.length() < count) {
-            return false;
-        }
-        for (int i = 0; i < count; i++) {
-            if (live.charAt(i) != cached.charAt(i)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void removeFromInsertedText(final WordFilter filter, final int insertedLength,
+    /** @return false if the editor would not hand out the text, so that it can be tried again. */
+    private boolean removeFromInsertedText(final WordFilter filter, final int insertedLength,
             final int window, final CharSequence afterRead) {
         final int scanned = Math.min(insertedLength, MAX_PASTE_SCAN);
         final CharSequence beforeRead = mConnection.getTextBeforeCursor(scanned + window);
         if (beforeRead == null) {
-            return;
+            return false;
         }
         // Words cut in half by the far edges of what was read are left out.
         final CharSequence before = beforeRead.length() >= scanned + window
@@ -386,8 +394,10 @@ public final class WordBlockController {
             }
         }
         if (last < 0) {
-            return;
+            Log.w(TAG, "scan: nothing blocked in " + text.length() + " chars read");
+            return true;
         }
+        Log.w(TAG, "scan: removing " + (last - first) + " of " + text.length() + " chars read");
         final StringBuilder keptBefore = new StringBuilder();
         final StringBuilder keptAfter = new StringBuilder();
         // Everything from the first blocked word to the cursor is deleted, so all of it that is not
@@ -413,6 +423,7 @@ public final class WordBlockController {
             endBatch();
             mLastActivityMillis = SystemClock.uptimeMillis();
         }
+        return true;
     }
 
     // ---- After a pause in typing (optional) ---------------------------------------------------
@@ -422,6 +433,7 @@ public final class WordBlockController {
         mLastActivityMillis = SystemClock.uptimeMillis();
         mHandler.removeCallbacks(mIdleRemoval);
         mHandler.removeCallbacks(mSettledCheck);
+        mHandler.removeCallbacks(mInsertScan);
     }
 
     /**

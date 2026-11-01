@@ -111,8 +111,10 @@ the unlock countdown while the settings are locked.
   app. "Clear storage" wipes the lock and the list (the app still cannot be uninstalled).
 - Text pasted into a field is checked: the pasted text and the words at either end of it are scanned, and
   only the blocked words and phrases are removed from it. The rest of the paste stays. This also covers
-  autofill and drag and drop. It works by noticing that text appeared that the keyboard did not type, so it
-  can miss a paste in an app that reports its cursor late or not at all, it only scans the first 4,000
+  autofill and drag and drop. It works by noticing that the cursor jumped forward by two or more
+  characters without the keyboard having typed anything, so tapping forward past a blocked word that is
+  already in the text removes it too, and it can miss a paste in an app that reports its cursor late or not
+  at all, it only scans the first 4,000
   characters of a very long paste, and the text it rewrites loses rich formatting such as bold. Voice input
   through another keyboard is not seen.
 - If you type a blocked word and tap an app's own Send button without a separator, a plain `word` entry may
