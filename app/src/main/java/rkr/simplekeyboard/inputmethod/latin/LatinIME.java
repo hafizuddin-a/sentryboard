@@ -435,11 +435,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // span, so we should reset our state unconditionally, even if restarting is true.
             // We also tell the input logic about the combining rules for the current subtype, so
             // it can adjust its combiners if needed.
+            // Where the keyboard thought the cursor was, before this restart tells it otherwise.
+            final int expectedSelStart = mInputLogic.mConnection.getExpectedSelectionStart();
             mInputLogic.startInput();
 
             // Some applications call onStartInputView without updating EditorInfo. In these cases
             // selection will be incorrect.
             mInputLogic.mConnection.reloadTextCache(editorInfo, restarting);
+            if (!isDifferentTextField) {
+                // Some apps (Chrome filling in a search suggestion) insert text by restarting the
+                // input session with the new cursor position, without any selection update.
+                mInputLogic.onInputRestarted(expectedSelStart, editorInfo.initialSelStart,
+                        editorInfo.initialSelEnd);
+            }
         }
 
         if (isDifferentTextField ||

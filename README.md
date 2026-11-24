@@ -36,7 +36,7 @@ Requires Android 7.0 or later.
 
 ## Install
 
-1. On your phone, download `Sentryboard-1.2.0.apk` from the [Releases](../../releases) page.
+1. On your phone, download `Sentryboard-1.2.1.apk` from the [Releases](../../releases) page.
 2. Open it. Android asks you to allow installs from the app you downloaded it with (your browser or Files):
    allow it. Google Play Protect may say it has not seen the app before: tap **More details**, then
    **Install anyway**. That is because the app is not on the Play Store, not because anything is wrong.
@@ -50,7 +50,7 @@ signed with the same key (every release is). Do not uninstall first: that erases
 
 **Check the download:** the APK is signed with a key whose SHA-256 fingerprint is
 `9d:bf:4f:e2:12:32:e0:c0:64:3a:76:54:58:a7:34:12:0d:97:83:5b:89:a4:09:1c:96:36:a9:b2:db:5a:85:79`.
-You can see it with `apksigner verify --print-certs Sentryboard-1.2.0.apk`.
+You can see it with `apksigner verify --print-certs Sentryboard-1.2.1.apk`.
 
 Prefer to read the code first? It is all in this repository, and you can build it yourself (below).
 
@@ -102,10 +102,13 @@ app or off. (It is a filter setting, so it is locked while the settings are lock
 | `helo wrld`, `hello wrld`, `gamblng`, `gmabling` | a mistyped letter (see below) |
 
 - **Typos** are caught for entries of 6 or more letters (8 for a phrase): one mistyped, added, missing or swapped
-  letter, two for entries of 10 or more. Short words get no typo tolerance, and a split and a typo never
-  combine, so `she llo` is not `hello`.
+  letter, two for entries of 8 or more, which also covers a last word cut short or garbled by a letter or
+  two (`amber kol`, `amber klo` for `amber kolt`). If what is left is itself an ordinary word (`amber lot`,
+  `amber colt`), it is left alone. Short words get no typo tolerance, and a split and a typo never combine, so
+  `she llo` is not `hello`.
 - **Ordinary words are never blocked this way.** A small built-in dictionary (a 176 KB Bloom filter, no network)
-  tells a mistyped word from a real one, so `hell`, `help`, `skill` and `killing` are safe next to `hello`
+  tells a mistyped word from a real one (words of 2-3 letters are checked against a short list of the
+  ones people really write, so an obscure `tui` does not count), so `hell`, `help`, `skill` and `killing` are safe next to `hello`
   or `kill`, and `al so` is not `also`. A run made only of real words is left alone, except when three or more of
   them spell an entry of 12 or more letters exactly (`fresh bread baked daily`). Two ordinary words such as
   `kitchen table` stay protected, so add such a pair as a phrase if you want it blocked.
@@ -114,6 +117,11 @@ app or off. (It is a filter setting, so it is locked while the settings are lock
 - **Accuracy**, measured on random mistyped ordinary words against a 40-entry list: about 0.03% were wrongly
   flagged; typos of entries of 6 or more letters were caught 83-95% of the time; splitting an entry in two with a
   space was caught 89% of the time (the rest split into two real words, which are deliberately left alone).
+- **Search suggestions.** Filling a suggestion into the search box (the little arrow on a suggestion) is caught like a
+  paste. **Tapping the suggestion itself** makes the browser search or open it at once, and the keyboard never sees
+  that text, so it cannot be stopped from here. The same goes for tapping browser history or a bookmark. Turning off
+  the browser's own search suggestions removes the temptation; in Chrome that is *Settings > Google services >
+  Autocomplete searches and URLs*.
 - **Browsers** means Chrome, Firefox, Brave, Edge, Samsung Internet, Opera, DuckDuckGo, Ecosia, Vivaldi, Kiwi, Tor
   Browser, Yandex, UC and a few others. A page opened inside another app (a chat app's built-in browser) counts as
   that app, so use *In every app* if you want it there.
@@ -146,7 +154,7 @@ the unlock countdown while the settings are locked.
 - It is friction, not a security boundary. Android's own *Device admin apps* screen can still switch
   uninstall protection off, you can switch to another keyboard, and a factory reset or safe mode removes the
   app. "Clear storage" wipes the lock and the list (the app still cannot be uninstalled).
-- Text pasted into a field is checked: the pasted text and the words at either end of it are scanned, and
+- Text pasted into a field (or filled in by an app that restarts the keyboard, such as a search suggestion) is checked: the pasted text and the words at either end of it are scanned, and
   only the blocked words and phrases are removed from it. The rest of the paste stays. This also covers
   autofill and drag and drop. It works by noticing that the cursor jumped forward
   without the keyboard having typed anything, so tapping forward past a blocked word that is

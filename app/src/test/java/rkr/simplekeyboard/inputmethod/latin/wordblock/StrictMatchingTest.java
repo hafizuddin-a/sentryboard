@@ -285,4 +285,46 @@ public class StrictMatchingTest {
         assertEquals(1, filter.strictSpans("f r e s h b r e a d b a k e d d a i l y").size());
         assertEquals(1, filter.strictSpans("s.l.o.w.g.r.e.e.n.r.i.v.e.r.f.e.r.r.y").size());
     }
+
+    @Test
+    public void obscureShortWordsDoNotMakeANameLookLikeOrdinaryText() {
+        assertFalse(sWords.isWord("tui"));
+        assertFalse(sWords.isWord("tu"));
+        assertFalse(sWords.isWord("tued"));
+        assertTrue(sWords.isWord("the"));
+        assertTrue(sWords.isWord("re"));
+        assertTrue(sWords.isWord("al"));
+        assertTrue(sWords.isWord("hot"));
+        assertTrue(sWords.isWord("hell"));
+    }
+
+    @Test
+    public void aCutOffOrMistypedNameIsCaught() {
+        final WordFilter filter = filterOf("amber kolt", "olive brannock");
+        assertEquals("amber klo", strict(filter, "amber klo"));
+        assertEquals("amber kol", strict(filter, "amber kol"));
+        assertEquals("amber kotl", strict(filter, "amber kotl"));
+        assertEquals("amberklo", strict(filter, "amberklo"));
+        assertEquals("olive branno", strict(filter, "olive branno"));
+        assertEquals("olive branock", strict(filter, "olive branock"));
+    }
+
+    @Test
+    public void aNameFollowedByAnOrdinaryWordIsNotATypo() {
+        final WordFilter filter = filterOf("amber kolt");
+        assertEquals("", strict(filter, "amber colt"));
+        assertEquals("", strict(filter, "amber bolt"));
+        assertEquals("", strict(filter, "amber lot"));
+        assertEquals("", strict(filter, "amber kit"));
+    }
+
+    @Test
+    public void twoTyposAreToleratedFromEightLetters() {
+        final WordFilter filter = filterOf("sandstorm");
+        assertEquals("sandstorm".length() - 2, "sndstrm".length());
+        assertEquals("sndstrm", strict(filter, "sndstrm"));
+        // A 6-letter entry tolerates one typo, not two.
+        assertEquals("plnks", strict(filterOf("planks"), "plnks"));
+        assertEquals("", strict(filterOf("planks"), "plnk"));
+    }
 }

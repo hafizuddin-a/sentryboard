@@ -126,6 +126,16 @@ public final class InputLogic {
         mWordBlock.afterSelectionChange(expectedSelStart, oldSelStart, newSelStart, newSelEnd);
     }
 
+    /**
+     * The app restarted the input session in the same field. If that moved the cursor forward
+     * without the keyboard having typed anything, text has been inserted (see
+     * {@link WordBlockController#afterSelectionChange}).
+     */
+    public void onInputRestarted(final int expectedSelStart, final int newSelStart,
+            final int newSelEnd) {
+        mWordBlock.afterSelectionChange(expectedSelStart, expectedSelStart, newSelStart, newSelEnd);
+    }
+
     public void reloadTextCache() {
         mConnection.reloadTextCache();
 

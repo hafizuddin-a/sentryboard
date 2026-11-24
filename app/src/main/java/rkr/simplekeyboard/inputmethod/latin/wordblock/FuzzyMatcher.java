@@ -59,7 +59,9 @@ final class FuzzyMatcher {
     static final int MIN_SKELETON = 4;
     static final int MIN_TYPO_SINGLE = 6;
     static final int MIN_TYPO_PHRASE = 8;
-    static final int TWO_TYPOS_FROM = 10;
+    /** Entries at least this long (squashed) tolerate two typos instead of one. */
+    static final int TWO_TYPOS_FROM_SINGLE = 8;
+    static final int TWO_TYPOS_FROM_PHRASE = 8;
     /**
      * An exact squash this long, made of at least {@link #LONG_EXACT_WORDS} words, is blocked even
      * if every word in it is an ordinary one: nobody writes {@code fresh bread baked daily} by
@@ -204,7 +206,8 @@ final class FuzzyMatcher {
     private static boolean phraseTypo(final String squash, final List<PhraseEntry> entries,
             final int tokenCount) {
         for (final PhraseEntry entry : entries) {
-            if ((tokenCount == entry.mWords || tokenCount == 1) && withinTypos(squash, entry.mSquash)) {
+            if ((tokenCount == entry.mWords || tokenCount == 1)
+                    && withinTypos(squash, entry.mSquash, TWO_TYPOS_FROM_PHRASE)) {
                 return true;
             }
         }
@@ -215,15 +218,15 @@ final class FuzzyMatcher {
         return phraseTypo(squash, mPhraseTypo, tokenCount);
     }
 
-    private static boolean withinTypos(final String squash, final String entry) {
-        final int most = entry.length() >= TWO_TYPOS_FROM ? 2 : 1;
+    private static boolean withinTypos(final String squash, final String entry, final int twoFrom) {
+        final int most = entry.length() >= twoFrom ? 2 : 1;
         return Math.abs(squash.length() - entry.length()) <= most && !squash.equals(entry)
                 && withinEdits(squash, entry, most);
     }
 
     private static boolean typo(final String squash, final List<String> entries) {
         for (final String entry : entries) {
-            if (withinTypos(squash, entry)) {
+            if (withinTypos(squash, entry, TWO_TYPOS_FROM_SINGLE)) {
                 return true;
             }
         }

@@ -26,6 +26,36 @@ package rkr.simplekeyboard.inputmethod.latin.wordblock;
  * Pure Java and immutable. {@link #NONE} knows no words, which turns the guard off.
  */
 final class CommonWords {
+    /**
+     * Words of two and three letters that people really write. The big word list is full of
+     * obscure short words ({@code tui}, {@code tu}) that would make a name look like ordinary
+     * text, so for words this short only this list is trusted.
+     */
+    private static final java.util.Set<String> SHORT_WORDS = new java.util.HashSet<>(
+            java.util.Arrays.asList((
+            // two letters
+            "ab ad ag ah ai al am an ar as at aw ax ay ba be bi bo by do ed eh el em en er es ex go "
+            + "ha he hi hm ho id if in is it jo la li lo ma me mi mm mo my na no nu of oh oi om on "
+            + "op or ow ox oy pa pi re sh so ta to uh um un up us we ya ye yo "
+            // three letters
+            + "ace act add ads age ago aid aim air all and any ape arc are arm art ask ate awe axe "
+            + "bad bag ban bar bat bay bed bee bet bid big bin bit bow box boy bud bug bus but buy bye "
+            + "cab can cap car cat cop cow cry cub cup cut dad dam day den dew did die dig dim dip "
+            + "dog dot dry dub due dug duo ear eat egg ego end era eve eye fan far fat fax fed fee few "
+            + "fig fin fit fix fly fog for fox fry fun fur gag gap gas gel gem get gig god got gum gun "
+            + "gut guy gym had hag ham has hat hay her hey hid him hip his hit hog hop hot how hub hug "
+            + "hut ice icy ill ink inn ion its ivy jab jam jar jaw jet job jog joy jug key kid kin kit "
+            + "lab lad lag lap law lay lea led leg let lid lie lip lit log lot low mad man map mat may "
+            + "men met mix mob mom mop mud mug nap net new nil nod nor not now nun nut oak oar oat odd "
+            + "off oil old one opt orb ore our out owe owl own pad pal pan pat paw pay pea peg pen pet "
+            + "pie pig pin pit ply pod pop pot pub pun put rag ram ran rap rat raw ray red rib rid rig "
+            + "rim rip rob rod rot row rub rug rum run rut rye sad sag sat saw say sea see set sew shy "
+            + "sin sip sir sit six ski sky sly sob sod son sow soy spa spy sub sue sum sun tab tag tan "
+            + "tap tar tax tea ten the thy tie tin tip toe ton too top tow toy try tub tug two urn use "
+            + "van vat vet via vow wag war was wax way web wed wet who why wig win wit woe won wow yak "
+            + "yam yap yes yet yew you zap zip zoo sex").split(" ")));
+
+
     /** Knows no words: nothing is ever treated as an ordinary word. */
     static final CommonWords NONE = new CommonWords(new byte[0], 0, 0);
 
@@ -75,19 +105,19 @@ final class CommonWords {
         if (mBitCount == 0 || length < 2) {
             return false;
         }
-        if (contains(word)) {
+        if (known(word)) {
             return true;
         }
         if (length < 4) {
             return false;
         }
-        if (endsWith(word, "s") && contains(word.substring(0, length - 1))) {
+        if (endsWith(word, "s") && known(word.substring(0, length - 1))) {
             return true;
         }
-        if (endsWith(word, "es") && contains(word.substring(0, length - 2))) {
+        if (endsWith(word, "es") && known(word.substring(0, length - 2))) {
             return true;
         }
-        if (endsWith(word, "ies") && contains(word.substring(0, length - 3) + "y")) {
+        if (endsWith(word, "ies") && known(word.substring(0, length - 3) + "y")) {
             return true;
         }
         if (endsWith(word, "ed") || endsWith(word, "er")) {
@@ -95,7 +125,7 @@ final class CommonWords {
                 return true;
             }
         }
-        if (endsWith(word, "d") && contains(word.substring(0, length - 1))) {
+        if (endsWith(word, "d") && known(word.substring(0, length - 1))) {
             return true;
         }
         if (endsWith(word, "ers") && stemIsWord(word, length - 3)) {
@@ -113,16 +143,21 @@ final class CommonWords {
     /** The stem before an ending, also with its final consonant undoubled or an "e" put back. */
     private boolean stemIsWord(final String word, final int stemLength) {
         final String stem = word.substring(0, stemLength);
-        if (contains(stem) || contains(stem + "e")) {
+        if (known(stem) || known(stem + "e")) {
             return true;
         }
         final int n = stem.length();
         return n >= 3 && stem.charAt(n - 1) == stem.charAt(n - 2)
-                && contains(stem.substring(0, n - 1));
+                && known(stem.substring(0, n - 1));
     }
 
     private static boolean endsWith(final String word, final String ending) {
         return word.endsWith(ending);
+    }
+
+    /** A word of two or three letters is known if it is on the short list, else if it is in the filter. */
+    private boolean known(final String word) {
+        return word.length() <= 3 ? SHORT_WORDS.contains(word) : contains(word);
     }
 
     private boolean contains(final String word) {
