@@ -36,7 +36,7 @@ Requires Android 7.0 or later.
 
 ## Install
 
-1. On your phone, download `Sentryboard-1.1.1.apk` from the [Releases](../../releases) page.
+1. On your phone, download `Sentryboard-1.2.0.apk` from the [Releases](../../releases) page.
 2. Open it. Android asks you to allow installs from the app you downloaded it with (your browser or Files):
    allow it. Google Play Protect may say it has not seen the app before: tap **More details**, then
    **Install anyway**. That is because the app is not on the Play Store, not because anything is wrong.
@@ -50,7 +50,7 @@ signed with the same key (every release is). Do not uninstall first: that erases
 
 **Check the download:** the APK is signed with a key whose SHA-256 fingerprint is
 `9d:bf:4f:e2:12:32:e0:c0:64:3a:76:54:58:a7:34:12:0d:97:83:5b:89:a4:09:1c:96:36:a9:b2:db:5a:85:79`.
-You can see it with `apksigner verify --print-certs Sentryboard-1.1.1.apk`.
+You can see it with `apksigner verify --print-certs Sentryboard-1.2.0.apk`.
 
 Prefer to read the code first? It is all in this repository, and you can build it yourself (below).
 
@@ -69,7 +69,7 @@ Type a blocked word followed by a space, punctuation or Enter, and it disappears
 Use `word!` only for words that are not the start of harmless words: with `ass!`, typing `assess` deletes
 `ass` as soon as its third letter is typed.
 
-- **Disguises:** accents are removed, case and apostrophes are ignored, and common leet is read
+- **Disguises (always on):** accents are removed, case and apostrophes are ignored, and common leet is read
   (`0`=o, `1`=i or l, `3`=e, `4`=a, `5`=s, `7`=t, `@`=a, `$`=s). Invisible characters put inside a word
   (zero-width spaces and joiners, soft hyphens, an accent written as a separate character) are ignored, and
   common Cyrillic and Greek lookalike letters are read as the Latin letter they resemble (`hеllo` with a
@@ -86,6 +86,38 @@ Use `word!` only for words that are not the start of harmless words: with `ass!`
 
 Under **Remove after a pause** (off by default) a blocked word is also removed if you stop typing for a
 moment, which helps when you tap an app's own Send button without typing a separator.
+
+## Strict matching
+
+Search engines work out what you meant even when letters are missing, so exact matching is easy to get
+around in a browser. **Strict matching** (*Word filter > Strict matching*) also catches an entry that has been
+split, spread out, stretched or mistyped. It is **on in web browsers by default**; you can switch it to every
+app or off. (It is a filter setting, so it is locked while the settings are locked.)
+
+| With `hello world` and `gambling` on the list, these are caught | |
+|---|---|
+| `h ello world`, `hello wor ld`, `hel lo  wor ld` | split anywhere, any spacing |
+| `h.e.l.l.o w.o.r.l.d`, `h e l l o` | letters spread out (up to 6 characters between them) |
+| `heeello`, `hhhello` | repeated letters |
+| `helo wrld`, `hello wrld`, `gamblng`, `gmabling` | a mistyped letter (see below) |
+
+- **Typos** are caught for entries of 6 or more letters (8 for a phrase): one mistyped, added, missing or swapped
+  letter, two for entries of 10 or more. Short words get no typo tolerance, and a split and a typo never
+  combine, so `she llo` is not `hello`.
+- **Ordinary words are never blocked this way.** A small built-in dictionary (a 176 KB Bloom filter, no network)
+  tells a mistyped word from a real one, so `hell`, `help`, `skill` and `killing` are safe next to `hello`
+  or `kill`, and `al so` is not `also`. A run made only of real words is left alone.
+- **At the moment you search:** in strict mode, pressing Go, Search or Enter checks the **whole field**, not only
+  the last word, and removes blocked text before the search is sent.
+- **Accuracy**, measured on random mistyped ordinary words against a 40-entry list: about 0.03% were wrongly
+  flagged; typos of entries of 6 or more letters were caught 83-95% of the time; splitting an entry in two with a
+  space was caught 89% of the time (the rest split into two real words, which are deliberately left alone).
+- **Browsers** means Chrome, Firefox, Brave, Edge, Samsung Internet, Opera, DuckDuckGo, Ecosia, Vivaldi, Kiwi, Tor
+  Browser, Yandex, UC and a few others. A page opened inside another app (a chat app's built-in browser) counts as
+  that app, so use *In every app* if you want it there.
+- It does not use a machine-learning model and never goes online. If you want content-aware blocking of what a
+  search *returns*, that has to happen outside the keyboard, for example with Android's **Private DNS** setting
+  pointed at a family-safe DNS provider.
 
 ## Settings lock
 
@@ -129,9 +161,10 @@ the unlock countdown while the settings are locked.
   space loses `hello world`).
 - It only works while Sentryboard is the active keyboard. English only: in other scripts, accents and marks
   are compared without, so a blocked word can match other words with the same base letters.
-- Still not matched: letters repeated or separated (`heeello`, `h e l l o`, `h.e.l.l.o`, `hel-lo`, `hel_lo`),
-  an emoji in the middle of a word, circled letters, and lookalike letters beyond the common Cyrillic and
-  Greek ones.
+- Letters that are repeated, separated or mistyped (`heeello`, `h e l l o`, `hel-lo`, `hellp`) are only caught
+  by [strict matching](#strict-matching), which is on in browsers only by default. Never matched: an emoji in the
+  middle of a word, circled letters, lookalike letters beyond the common Cyrillic and Greek ones, synonyms and
+  slang, other languages, and a typo of a word shorter than 6 letters.
 
 ## Permissions
 

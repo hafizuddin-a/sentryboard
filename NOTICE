@@ -10,3 +10,8 @@ The full license text is in the LICENSE file. The copyright notices of the
 upstream authors and contributors are retained unchanged in the header of
 each source file. Modifications made by this fork are described in README.md and recorded
 in this repository's commit history.
+
+The strict matching uses a Bloom filter of English words built from the system word
+list (/usr/share/dict/words, Webster's Second International Dictionary, 1934) with
+tools/make_common_words.py. The filter (app/src/main/res/raw/common_words.bin) holds
+only hashed bits, not the words.

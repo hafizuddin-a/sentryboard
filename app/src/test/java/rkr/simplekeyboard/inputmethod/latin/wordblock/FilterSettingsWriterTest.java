@@ -53,4 +53,18 @@ public class FilterSettingsWriterTest {
         mPrefs.failWrites = true;
         assertFalse(mWriter.setEnabled(false));
     }
+
+    @Test
+    public void strictScopeIsWrittenOnlyWhileUnlockedAndOnlyForKnownValues() {
+        assertTrue(mWriter.setStrict("all"));
+        assertEquals("all", mPrefs.raw().get(FilterSettingsWriter.KEY_STRICT));
+        assertTrue(mWriter.setStrict("off"));
+        assertTrue(mWriter.setStrict("browsers"));
+        assertFalse(mWriter.setStrict("everywhere"));
+        assertFalse(mWriter.setStrict(null));
+        assertEquals("browsers", mPrefs.raw().get(FilterSettingsWriter.KEY_STRICT));
+        mLocked = true;
+        assertFalse(mWriter.setStrict("off"));
+        assertEquals("browsers", mPrefs.raw().get(FilterSettingsWriter.KEY_STRICT));
+    }
 }

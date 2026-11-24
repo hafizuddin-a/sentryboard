@@ -78,6 +78,7 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     private SwitchPreference mEnabled;
     private SwitchPreference mIdleEnabled;
     private ListPreference mIdleDelay;
+    private ListPreference mStrict;
     private final List<Preference> mEntryPreferences = new ArrayList<>();
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final Runnable mTick = this::onTick;
@@ -104,6 +105,7 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         mEnabled = (SwitchPreference) findPreference(Settings.PREF_WORDBLOCK_ENABLED);
         mIdleEnabled = (SwitchPreference) findPreference(Settings.PREF_WORDBLOCK_IDLE_ENABLED);
         mIdleDelay = (ListPreference) findPreference(Settings.PREF_WORDBLOCK_IDLE_MS);
+        mStrict = (ListPreference) findPreference(Settings.PREF_WORDBLOCK_STRICT);
         setUpIdleDelayChoices();
 
         mLock.setOnPreferenceClickListener(p -> { chooseDurationAndLock(); return true; });
@@ -120,6 +122,8 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
                 (p, value) -> mWriter.setIdleEnabled((Boolean) value));
         mIdleDelay.setOnPreferenceChangeListener(
                 (p, value) -> mWriter.setIdleMillis(Integer.parseInt((String) value)));
+        mStrict.setOnPreferenceChangeListener(
+                (p, value) -> mWriter.setStrict((String) value));
     }
 
     private Preference orderedLockItem(final String key, final int order) {
@@ -153,9 +157,11 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         mEnabled.setChecked(Settings.readWordBlockEnabled(prefs));
         mIdleEnabled.setChecked(Settings.readWordBlockIdleEnabled(prefs));
         mIdleDelay.setValue(String.valueOf(Settings.readWordBlockIdleMillis(prefs)));
+        mStrict.setValue(Settings.readWordBlockStrict(prefs));
         mEnabled.setEnabled(editable);
         mIdleEnabled.setEnabled(editable);
         mIdleDelay.setEnabled(editable);
+        mStrict.setEnabled(editable);
         // Adding a word is always allowed, even while locked; only removing is not.
         findPreference(KEY_ADD).setEnabled(true);
 

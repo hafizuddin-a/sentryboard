@@ -68,6 +68,11 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_WORDBLOCK_IDLE_ENABLED = "pref_wordblock_idle_enabled";
     public static final String PREF_WORDBLOCK_IDLE_MS = "pref_wordblock_idle_ms";
     public static final int DEFAULT_WORDBLOCK_IDLE_MS = 500;
+    public static final String PREF_WORDBLOCK_STRICT = "pref_wordblock_strict";
+    /** Strict matching (disguised and mistyped words) is off, only in browsers, or everywhere. */
+    public static final String STRICT_OFF = "off";
+    public static final String STRICT_BROWSERS = "browsers";
+    public static final String STRICT_ALL = "all";
 
     private static final float UNDEFINED_PREFERENCE_VALUE_FLOAT = -1.0f;
     private static final int UNDEFINED_PREFERENCE_VALUE_INT = -1;
@@ -272,6 +277,12 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         } catch (NumberFormatException e) {
             return DEFAULT_WORDBLOCK_IDLE_MS;
         }
+    }
+
+    /** @return one of {@link #STRICT_OFF}, {@link #STRICT_BROWSERS} (the default), {@link #STRICT_ALL}. */
+    public static String readWordBlockStrict(final SharedPreferences prefs) {
+        final String value = prefs.getString(PREF_WORDBLOCK_STRICT, STRICT_BROWSERS);
+        return STRICT_OFF.equals(value) || STRICT_ALL.equals(value) ? value : STRICT_BROWSERS;
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {

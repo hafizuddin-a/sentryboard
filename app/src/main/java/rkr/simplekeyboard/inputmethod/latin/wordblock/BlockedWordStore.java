@@ -18,10 +18,12 @@ import android.content.Context;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsGate;
 import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.WriteGate;
@@ -59,6 +62,7 @@ public final class BlockedWordStore {
     private final File mFile;
     private final WriteGate mGate;
     private volatile List<String> mEntries = Collections.emptyList();
+    private final CommonWords mCommonWords;
     private volatile WordFilter mFilter = new WordFilter(mEntries);
 
     /**
@@ -66,8 +70,13 @@ public final class BlockedWordStore {
      * Removing entries is refused while {@code gate} says the settings are locked; adding is not.
      */
     public BlockedWordStore(final File file, final WriteGate gate) {
+        this(file, gate, CommonWords.NONE);
+    }
+
+    BlockedWordStore(final File file, final WriteGate gate, final CommonWords commonWords) {
         mFile = file;
         mGate = gate;
+        mCommonWords = commonWords;
         load();
     }
 
@@ -76,9 +85,24 @@ public final class BlockedWordStore {
         if (sInstance == null) {
             final Context deviceContext = PreferenceManagerCompat.getDeviceContext(context);
             sInstance = new BlockedWordStore(new File(deviceContext.getFilesDir(), FILE_NAME),
-                    SettingsGate.getInstance(context));
+                    SettingsGate.getInstance(context), loadCommonWords(context));
         }
         return sInstance;
+    }
+
+    /** The ordinary-word list for strict matching, or none (which turns that guard off). */
+    private static CommonWords loadCommonWords(final Context context) {
+        try (InputStream in = context.getResources().openRawResource(R.raw.common_words)) {
+            final ByteArrayOutputStream out = new ByteArrayOutputStream(1 << 18);
+            final byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) > 0) {
+                out.write(buffer, 0, read);
+            }
+            return CommonWords.fromBytes(out.toByteArray());
+        } catch (IOException | RuntimeException e) {
+            return CommonWords.NONE;
+        }
     }
 
     /** @return the current filter. Never null, and safe to call on every keystroke. */
@@ -127,7 +151,7 @@ public final class BlockedWordStore {
             return false;
         }
         mEntries = Collections.unmodifiableList(updated);
-        mFilter = new WordFilter(updated);
+        mFilter = new WordFilter(updated, mCommonWords);
         return true;
     }
 
@@ -174,7 +198,7 @@ public final class BlockedWordStore {
             }
         }
         mEntries = Collections.unmodifiableList(entries);
-        mFilter = new WordFilter(entries);
+        mFilter = new WordFilter(entries, mCommonWords);
     }
 
     /** Writes the whole list to a temporary file and renames it over the real one. */

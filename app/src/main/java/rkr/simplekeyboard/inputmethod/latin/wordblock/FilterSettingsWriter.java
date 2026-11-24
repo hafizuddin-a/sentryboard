@@ -29,6 +29,7 @@ public final class FilterSettingsWriter {
     static final String KEY_ENABLED = "pref_wordblock_enabled";
     static final String KEY_IDLE_ENABLED = "pref_wordblock_idle_enabled";
     static final String KEY_IDLE_MS = "pref_wordblock_idle_ms";
+    static final String KEY_STRICT = "pref_wordblock_strict";
     static final int MIN_IDLE_MS = 100;
     static final int MAX_IDLE_MS = 10_000;
 
@@ -49,6 +50,13 @@ public final class FilterSettingsWriter {
     public boolean setIdleEnabled(final boolean enabled) {
         return mGate.canModifyFilterSettings()
                 && mPrefs.edit().putBoolean(KEY_IDLE_ENABLED, enabled).commit();
+    }
+
+    /** @param scope "off", "browsers" or "all"; anything else is refused. */
+    public boolean setStrict(final String scope) {
+        return ("off".equals(scope) || "browsers".equals(scope) || "all".equals(scope))
+                && mGate.canModifyFilterSettings()
+                && mPrefs.edit().putString(KEY_STRICT, scope).commit();
     }
 
     /** The delay is stored as a string, because the list preference that edits it stores one. */

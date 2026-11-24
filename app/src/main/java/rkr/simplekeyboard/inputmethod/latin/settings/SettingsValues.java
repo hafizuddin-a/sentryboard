@@ -52,6 +52,7 @@ public class SettingsValues {
     public final boolean mWordBlockEnabled;
     public final boolean mWordBlockIdleEnabled;
     public final int mWordBlockIdleMillis;
+    public final String mWordBlockStrict;
 
     // From the input box
     public final InputAttributes mInputAttributes;
@@ -97,6 +98,7 @@ public class SettingsValues {
         mWordBlockEnabled = Settings.readWordBlockEnabled(prefs);
         mWordBlockIdleEnabled = Settings.readWordBlockIdleEnabled(prefs);
         mWordBlockIdleMillis = Settings.readWordBlockIdleMillis(prefs);
+        mWordBlockStrict = Settings.readWordBlockStrict(prefs);
     }
 
     public boolean isWordSeparator(final int code) {

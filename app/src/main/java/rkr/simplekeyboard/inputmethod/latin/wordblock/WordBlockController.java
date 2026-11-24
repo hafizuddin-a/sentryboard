@@ -62,6 +62,8 @@ public final class WordBlockController {
     private static final long INSERT_SCAN_FIRST_MILLIS = 50;
     private static final long INSERT_SCAN_RETRY_MILLIS = 80;
     private static final int INSERT_SCAN_ATTEMPTS = 8;
+    // The most text that is read from each side of the cursor when a whole field is scanned.
+    private static final int MAX_FIELD_SCAN = 2000;
     // The most pasted text that is scanned (the rest of a longer paste is left alone).
     private static final int MAX_PASTE_SCAN = 4000;
 
@@ -109,8 +111,47 @@ public final class WordBlockController {
      */
     public void beforeEditorAction(final SettingsValues settingsValues,
             final EditorInfo editorInfo) {
+        if (removeBlockedFromWholeField(settingsValues, editorInfo)) {
+            return;
+        }
         if (removeBlockedWord(settingsValues, editorInfo)) {
             endBatch();
+        }
+    }
+
+    /**
+     * With strict matching on, the whole field is checked when an action such as Go or Search is
+     * about to be performed, not just the word before the cursor: that is the moment a search is
+     * sent, and it catches text that got into the field some way the other checks did not see.
+     *
+     * @return true if the field was checked (whether or not anything was removed); false if strict
+     * matching is off here or the editor would not hand out its text, so the caller does the
+     * ordinary check instead.
+     */
+    private boolean removeBlockedFromWholeField(final SettingsValues settingsValues,
+            final EditorInfo editorInfo) {
+        try {
+            if (!isActive(settingsValues, editorInfo) || !isStrict(settingsValues, editorInfo)) {
+                return false;
+            }
+            final WordFilter filter = getStore().getFilter();
+            if (filter.isEmpty()) {
+                return false;
+            }
+            final CharSequence beforeRead = mConnection.getTextBeforeCursor(MAX_FIELD_SCAN);
+            final CharSequence afterRead = mConnection.getTextAfterCursor(MAX_FIELD_SCAN);
+            if (beforeRead == null || afterRead == null) {
+                return false;
+            }
+            final CharSequence before = beforeRead.length() >= MAX_FIELD_SCAN
+                    ? WordFilter.dropPartialStart(beforeRead) : beforeRead;
+            final CharSequence after = afterRead.length() >= MAX_FIELD_SCAN
+                    ? WordFilter.dropPartialEnd(afterRead) : afterRead;
+            removeBlockedSpans(filter, true, before, after, 0, before.length() + after.length());
+            return true;
+        } catch (RuntimeException e) {
+            logFailure(e);
+            return false;
         }
     }
 
@@ -127,8 +168,10 @@ public final class WordBlockController {
             }
             final int window = windowFor(filter);
             // Some editors (terminals, custom views) return null. Then there is nothing to check.
-            final int length = filter.blockedLengthBefore(
-                    wholeWordsOnly(mConnection.getTextBeforeCursor(window), window));
+            final CharSequence before =
+                    wholeWordsOnly(mConnection.getTextBeforeCursor(window), window);
+            final int length = isStrict(settingsValues, editorInfo)
+                    ? filter.strictBlockedLengthBefore(before) : filter.blockedLengthBefore(before);
             if (length == 0) {
                 return false;
             }
@@ -222,7 +265,7 @@ public final class WordBlockController {
             if (filter == null) {
                 return;
             }
-            removeAroundCursor(filter);
+            removeAroundCursor(filter, isStrict(settingsValues, editorInfo));
             mHandler.removeCallbacks(mSettledCheck);
             mHandler.postDelayed(mSettledCheck, SETTLE_MILLIS);
         } catch (RuntimeException e) {
@@ -247,7 +290,7 @@ public final class WordBlockController {
                 return;
             }
             if (filterToCheckAroundCursor(settingsValues, editorInfo) != null) {
-                removeAroundCursor(filter);
+                removeAroundCursor(filter, isStrict(settingsValues, editorInfo));
             }
         } catch (RuntimeException e) {
             logFailure(e);
@@ -269,7 +312,7 @@ public final class WordBlockController {
         return mConnection.getCachedTextAfterCursor(1).length() == 0 ? null : filter;
     }
 
-    private void removeAroundCursor(final WordFilter filter) {
+    private void removeAroundCursor(final WordFilter filter, final boolean strict) {
         final int window = windowFor(filter);
         final CharSequence before = wholeWordsOnly(mConnection.getTextBeforeCursor(window), window);
         final CharSequence after = mConnection.getTextAfterCursor(window);
@@ -278,8 +321,10 @@ public final class WordBlockController {
         }
         // A word cut by the far edge of the window may go on beyond it: do not judge a word by a
         // piece of it.
-        final WordFilter.Hit hit = filter.blockedAround(before,
-                after.length() >= window ? WordFilter.dropPartialEnd(after) : after);
+        final CharSequence wholeAfter =
+                after.length() >= window ? WordFilter.dropPartialEnd(after) : after;
+        final WordFilter.Hit hit = strict ? filter.strictBlockedAround(before, wholeAfter)
+                : filter.blockedAround(before, wholeAfter);
         if (hit == null) {
             return;
         }
@@ -336,8 +381,9 @@ public final class WordBlockController {
 
     private void scanInsertedText() {
         try {
-            final WordFilter filter = filterToCheckAfterInsert(Settings.getInstance().getCurrent(),
-                    mLatinIme.getCurrentInputEditorInfo());
+            final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+            final EditorInfo editorInfo = mLatinIme.getCurrentInputEditorInfo();
+            final WordFilter filter = filterToCheckAfterInsert(settingsValues, editorInfo);
             // Not if the cursor has moved on, or something is selected, in the meantime.
             if (filter == null || mConnection.hasSelection()
                     || mConnection.getExpectedSelectionStart() != mInsertedEnd) {
@@ -345,7 +391,8 @@ public final class WordBlockController {
             }
             final int window = windowFor(filter);
             final CharSequence after = mConnection.getTextAfterCursor(window);
-            if (after == null || !removeFromInsertedText(filter, mInsertedLength, window, after)) {
+            if (after == null || !removeFromInsertedText(filter,
+                    isStrict(settingsValues, editorInfo), mInsertedLength, window, after)) {
                 if (++mScanAttempts < INSERT_SCAN_ATTEMPTS) {
                     mHandler.postDelayed(mInsertScan, INSERT_SCAN_RETRY_MILLIS);
                 }
@@ -365,8 +412,8 @@ public final class WordBlockController {
     }
 
     /** @return false if the editor would not hand out the text, so that it can be tried again. */
-    private boolean removeFromInsertedText(final WordFilter filter, final int insertedLength,
-            final int window, final CharSequence afterRead) {
+    private boolean removeFromInsertedText(final WordFilter filter, final boolean strict,
+            final int insertedLength, final int window, final CharSequence afterRead) {
         final int scanned = Math.min(insertedLength, MAX_PASTE_SCAN);
         final CharSequence beforeRead = mConnection.getTextBeforeCursor(scanned + window);
         if (beforeRead == null) {
@@ -378,39 +425,55 @@ public final class WordBlockController {
         final CharSequence after = afterRead.length() >= window
                 ? WordFilter.dropPartialEnd(afterRead) : afterRead;
         final int cursor = before.length();
-        final int insertedStart = Math.max(0, cursor - insertedLength);
+        removeBlockedSpans(filter, strict, before, after, Math.max(0, cursor - insertedLength),
+                cursor);
+        return true;
+    }
+
+    /**
+     * Removes the blocked words and phrases from the text around the cursor and puts back the rest
+     * of what had to be deleted with them (which may lie on either side of the cursor).
+     *
+     * @param from only matches that end after this position in {@code before + after}.
+     * @param to only matches that start before this position.
+     */
+    private void removeBlockedSpans(final WordFilter filter, final boolean strict,
+            final CharSequence before, final CharSequence after, final int from, final int to) {
+        final int cursor = before.length();
         final String text = new StringBuilder(cursor + after.length())
                 .append(before).append(after).toString();
-
-        // The blocked words that overlap the inserted text, which may reach into the words next to it.
         final boolean[] removed = new boolean[text.length()];
         int first = Integer.MAX_VALUE;
         int last = -1;
-        for (final int[] span : filter.blockedSpans(text)) {
-            if (span[0] < cursor && span[1] > insertedStart) {
+        for (final int[] span : strict ? filter.strictSpans(text) : filter.blockedSpans(text)) {
+            if (span[0] < to && span[1] > from) {
                 java.util.Arrays.fill(removed, span[0], span[1], true);
                 first = Math.min(first, span[0]);
                 last = Math.max(last, span[1]);
             }
         }
         if (last < 0) {
-            return true;
+            return;
         }
+        // Everything from the first match to the last, and up to the cursor, is deleted, so all of
+        // it that is not blocked has to be put back.
+        final int low = Math.min(first, cursor);
+        final int high = Math.max(last, cursor);
         final StringBuilder keptBefore = new StringBuilder();
         final StringBuilder keptAfter = new StringBuilder();
-        // Everything from the first blocked word to the cursor is deleted, so all of it that is not
-        // blocked has to be put back, not only what lies before the last blocked word.
-        for (int i = first; i < Math.max(last, cursor); i++) {
+        for (int i = low; i < high; i++) {
             if (!removed[i]) {
                 (i < cursor ? keptBefore : keptAfter).append(text.charAt(i));
             }
         }
         mConnection.beginBatchEdit();
         try {
-            if (last > cursor) {
-                mConnection.deleteTextAfterCursor(last - cursor);
+            if (high > cursor) {
+                mConnection.deleteTextAfterCursor(high - cursor);
             }
-            mConnection.deleteTextBeforeCursor(cursor - first);
+            if (cursor > low) {
+                mConnection.deleteTextBeforeCursor(cursor - low);
+            }
             if (keptBefore.length() > 0) {
                 mConnection.commitText(keptBefore, 1);
             }
@@ -421,7 +484,6 @@ public final class WordBlockController {
             endBatch();
             mLastActivityMillis = SystemClock.uptimeMillis();
         }
-        return true;
     }
 
     // ---- After a pause in typing (optional) ---------------------------------------------------
@@ -461,8 +523,10 @@ public final class WordBlockController {
             }
             final WordFilter filter = getStore().getFilter();
             final int window = windowFor(filter);
-            final int length = filter.blockedLengthBefore(
-                    wholeWordsOnly(mConnection.getTextBeforeCursor(window), window));
+            final CharSequence before =
+                    wholeWordsOnly(mConnection.getTextBeforeCursor(window), window);
+            final int length = isStrict(settingsValues, editorInfo)
+                    ? filter.strictBlockedLengthBefore(before) : filter.blockedLengthBefore(before);
             if (length > 0) {
                 deleteNow(length);
             }
@@ -473,6 +537,25 @@ public final class WordBlockController {
 
     // ---- Shared -------------------------------------------------------------------------------
 
+    /**
+     * @return true if strict matching (disguised and mistyped words, see {@link FuzzyMatcher}) is on
+     * for the app being typed in: in every app, or only in web browsers, as the setting says.
+     */
+    private static boolean isStrict(final SettingsValues settingsValues,
+            final EditorInfo editorInfo) {
+        if (editorInfo == null) {
+            return false;
+        }
+        switch (settingsValues.mWordBlockStrict) {
+            case Settings.STRICT_ALL:
+                return true;
+            case Settings.STRICT_BROWSERS:
+                return BrowserApps.isBrowser(editorInfo.packageName);
+            default:
+                return false;
+        }
+    }
+
     private boolean isActive(final SettingsValues settingsValues, final EditorInfo editorInfo) {
         return settingsValues.mWordBlockEnabled && editorInfo != null
                 && FieldPolicy.isFilterable(editorInfo.inputType);
@@ -480,7 +563,7 @@ public final class WordBlockController {
 
     /** How much text to read back from the editor to be sure to see a whole listed word. */
     private static int windowFor(final WordFilter filter) {
-        return Math.max(MIN_WINDOW, filter.maxEntryLength() + WINDOW_MARGIN);
+        return Math.max(MIN_WINDOW, filter.maxReadLength() + WINDOW_MARGIN);
     }
 
     /**

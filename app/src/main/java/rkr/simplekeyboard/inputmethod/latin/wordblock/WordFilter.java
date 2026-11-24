@@ -60,11 +60,21 @@ public final class WordFilter {
     private final Set<String> mInstantWords = new HashSet<>();
     private final Set<String> mStems = new HashSet<>();
     private final PhraseSet mPhrases = new PhraseSet();
+    private final FuzzyMatcher mFuzzy;
     private int mMinStemLength = Integer.MAX_VALUE;
     private int mMaxStemLength = 0;
     private int mMaxEntryLength = 0;
 
     public WordFilter(final Collection<String> rawEntries) {
+        this(rawEntries, CommonWords.NONE);
+    }
+
+    /**
+     * @param commonWords the ordinary words that strict matching must never block (see
+     * {@link #strictSpans}); {@link CommonWords#NONE} turns that guard off.
+     */
+    WordFilter(final Collection<String> rawEntries, final CommonWords commonWords) {
+        mFuzzy = new FuzzyMatcher(commonWords);
         if (rawEntries == null) {
             return;
         }
@@ -79,7 +89,13 @@ public final class WordFilter {
                     words.add(variantsOf(word));
                 }
                 mPhrases.add(words, entry.mWildcard, entry.mInstant);
+                if (!entry.mWildcard) {
+                    mFuzzy.add(joined(words), true);
+                }
                 continue;
+            }
+            if (!entry.mWildcard) {
+                mFuzzy.add(variantsOf(entry.mBody), entry.mBody.indexOf('_') >= 0);
             }
             for (final String variant : variantsOf(entry.mBody)) {
                 mMaxEntryLength = Math.max(mMaxEntryLength, variant.length());
@@ -95,6 +111,25 @@ public final class WordFilter {
                 }
             }
         }
+    }
+
+    /** Every way of reading the words of a phrase, joined (at most MAX_VARIANTS of them). */
+    private static Set<String> joined(final List<Set<String>> words) {
+        Set<String> result = new LinkedHashSet<>();
+        result.add("");
+        for (final Set<String> readings : words) {
+            final Set<String> next = new LinkedHashSet<>();
+            for (final String prefix : result) {
+                for (final String reading : readings) {
+                    next.add(prefix + reading);
+                    if (next.size() >= MAX_VARIANTS) {
+                        break;
+                    }
+                }
+            }
+            result = next;
+        }
+        return result;
     }
 
     /**
@@ -276,6 +311,62 @@ public final class WordFilter {
         if (isEmpty() || text == null) {
             return found;
         }
+        collectSpans(text, found);
+        return widestWithoutOverlap(found);
+    }
+
+    /**
+     * Like {@link #blockedSpans}, and also finds entries that were disguised by splitting them,
+     * separating their letters, repeating letters or mistyping them: {@code h ello world},
+     * {@code h.e.l.l.o}, {@code heeello}, {@code hellp} (see {@link FuzzyMatcher}). Runs made only of
+     * ordinary words are never blocked this way, which needs the {@link CommonWords} given to the
+     * constructor to be effective.
+     */
+    public List<int[]> strictSpans(final CharSequence text) {
+        final List<int[]> found = new ArrayList<>();
+        if (isEmpty() || text == null) {
+            return found;
+        }
+        collectSpans(text, found);
+        mFuzzy.spans(text, found);
+        return widestWithoutOverlap(found);
+    }
+
+    /** Like {@link #blockedLengthBefore}, with strict matching. */
+    public int strictBlockedLengthBefore(final CharSequence textBeforeCursor) {
+        if (isEmpty() || textBeforeCursor == null) {
+            return 0;
+        }
+        final int length = textBeforeCursor.length();
+        int best = 0;
+        for (final int[] span : strictSpans(textBeforeCursor)) {
+            if (span[1] == length) {
+                best = Math.max(best, span[1] - span[0]);
+            }
+        }
+        return best;
+    }
+
+    /** Like {@link #blockedAround}, with strict matching. */
+    public Hit strictBlockedAround(final CharSequence before, final CharSequence after) {
+        if (isEmpty() || before == null || after == null) {
+            return null;
+        }
+        final int cursor = before.length();
+        final String text = new StringBuilder(cursor + after.length())
+                .append(before).append(after).toString();
+        int bestStart = -1;
+        int bestEnd = -1;
+        for (final int[] span : strictSpans(text)) {
+            if (span[0] <= cursor && span[1] >= cursor && span[1] - span[0] > bestEnd - bestStart) {
+                bestStart = span[0];
+                bestEnd = span[1];
+            }
+        }
+        return bestStart < 0 ? null : new Hit(cursor - bestStart, bestEnd - cursor);
+    }
+
+    private void collectSpans(final CharSequence text, final List<int[]> found) {
         final int length = text.length();
         int i = 0;
         while (i < length) {
@@ -293,8 +384,10 @@ public final class WordFilter {
             }
         }
         mPhrases.spans(text, found);
+    }
 
-        // Widest first, keeping a span only if it does not overlap one already kept.
+    /** Widest first, keeping a span only if it does not overlap one already kept; in order. */
+    private static List<int[]> widestWithoutOverlap(final List<int[]> found) {
         found.sort((a, b) -> a[1] - a[0] != b[1] - b[0] ? (b[1] - b[0]) - (a[1] - a[0]) : a[0] - b[0]);
         final List<int[]> kept = new ArrayList<>();
         for (final int[] span : found) {
@@ -485,6 +578,15 @@ public final class WordFilter {
     /** @return true if at least one entry is marked with {@code !}. */
     public boolean hasInstantEntries() {
         return !mInstantWords.isEmpty() || mPhrases.hasInstant();
+    }
+
+    /**
+     * @return how much text, in chars, to read back from the editor to be sure to see a whole match
+     * of any kind, which for strict matching is more than the entry itself (letters may be spread
+     * out).
+     */
+    public int maxReadLength() {
+        return Math.max(maxEntryLength(), mFuzzy.maxLength());
     }
 
     /**

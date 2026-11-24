@@ -60,6 +60,15 @@
         android:summary="%s"
         android:dependency="pref_wordblock_idle_enabled"
         android:defaultValue="500" />
+    <ListPreference
+        android:key="pref_wordblock_strict"
+        android:persistent="false"
+        android:title="@string/wordblock_strict"
+        android:summary="%s"
+        android:dependency="pref_wordblock_enabled"
+        android:entries="@array/wordblock_strict_entries"
+        android:entryValues="@array/wordblock_strict_values"
+        android:defaultValue="browsers" />
     <PreferenceCategory
         android:key="wordblock_list"
         android:title="@string/wordblock_list_category">
