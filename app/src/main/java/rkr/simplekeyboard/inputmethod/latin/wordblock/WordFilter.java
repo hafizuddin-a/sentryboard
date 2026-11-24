@@ -90,12 +90,12 @@ public final class WordFilter {
                 }
                 mPhrases.add(words, entry.mWildcard, entry.mInstant);
                 if (!entry.mWildcard) {
-                    mFuzzy.add(joined(words), true);
+                    mFuzzy.add(joined(words), words.size());
                 }
                 continue;
             }
             if (!entry.mWildcard) {
-                mFuzzy.add(variantsOf(entry.mBody), entry.mBody.indexOf('_') >= 0);
+                mFuzzy.add(variantsOf(entry.mBody), wordCount(entry.mBody));
             }
             for (final String variant : variantsOf(entry.mBody)) {
                 mMaxEntryLength = Math.max(mMaxEntryLength, variant.length());
@@ -111,6 +111,17 @@ public final class WordFilter {
                 }
             }
         }
+    }
+
+    /** How many words a body is written with: its parts between underscores (one if none). */
+    private static int wordCount(final String body) {
+        int count = 0;
+        for (final String part : body.split("_")) {
+            if (!part.isEmpty()) {
+                count++;
+            }
+        }
+        return Math.max(1, count);
     }
 
     /** Every way of reading the words of a phrase, joined (at most MAX_VARIANTS of them). */

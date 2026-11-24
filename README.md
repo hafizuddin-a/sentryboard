@@ -106,7 +106,9 @@ app or off. (It is a filter setting, so it is locked while the settings are lock
   combine, so `she llo` is not `hello`.
 - **Ordinary words are never blocked this way.** A small built-in dictionary (a 176 KB Bloom filter, no network)
   tells a mistyped word from a real one, so `hell`, `help`, `skill` and `killing` are safe next to `hello`
-  or `kill`, and `al so` is not `also`. A run made only of real words is left alone.
+  or `kill`, and `al so` is not `also`. A run made only of real words is left alone, except when three or more of
+  them spell an entry of 12 or more letters exactly (`fresh bread baked daily`). Two ordinary words such as
+  `kitchen table` stay protected, so add such a pair as a phrase if you want it blocked.
 - **At the moment you search:** in strict mode, pressing Go, Search or Enter checks the **whole field**, not only
   the last word, and removes blocked text before the search is sent.
 - **Accuracy**, measured on random mistyped ordinary words against a 40-entry list: about 0.03% were wrongly

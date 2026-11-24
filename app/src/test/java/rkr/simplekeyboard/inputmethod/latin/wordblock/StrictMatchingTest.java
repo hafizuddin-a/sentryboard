@@ -238,4 +238,51 @@ public class StrictMatchingTest {
         final WordFilter filter = new WordFilter(Arrays.asList("gambling"));
         assertEquals("gamblng", strict(filter, "gamblng"));
     }
+
+    @Test
+    public void aShortWordSlippedBetweenTheWordsOfAPhraseIsNotATypo() {
+        final WordFilter filter = filterOf("penny marsh", "amber kolt", "red_apples");
+        assertEquals("", strict(filter, "Ask Penny to marsh and sing for us"));
+        assertEquals("", strict(filter, "amber and kolt went home"));
+        assertEquals("", strict(filter, "she has a red apple for lunch"));
+    }
+
+    @Test
+    public void aPhraseTypoKeepsTheNumberOfWordsOrRunsThemTogether() {
+        final WordFilter filter = filterOf("penny marsh", "hello world");
+        assertEquals("peny marsh", strict(filter, "peny marsh"));
+        assertEquals("penymarsh", strict(filter, "penymarsh"));
+        assertEquals("helo wrld", strict(filter, "helo wrld"));
+        assertEquals("helloworl", strict(filter, "helloworl"));
+    }
+
+    @Test
+    public void aAndIAreOrdinaryWordsButOtherSingleLettersAreFragments() {
+        // "a lso" is also split after the "a", which is only a fragment if "lso" is.
+        assertEquals("a lso", strict(filterOf("also"), "a lso"));
+        assertEquals("h ello", strict(filterOf("hello"), "h ello"));
+        assertEquals("", strict(filterOf("also"), "i al so"));
+    }
+
+    @Test
+    public void aLongEntryMadeOfOrdinaryWordsIsCaughtWhenSpelledOutExactly() {
+        final WordFilter filter = filterOf("freshbreadbakeddaily", "hotdogstandfans");
+        assertEquals("fresh bread baked daily", strict(filter, "fresh bread baked daily"));
+        assertEquals("hot dog stand fans", strict(filter, "hot dog stand fans"));
+        // Two ordinary words side by side stay protected, however long the entry.
+        assertEquals("", strict(filterOf("kitchentable"), "my kitchen table is very old"));
+        assertEquals("", strict(filterOf("blackfridaysale"), "black friday"));
+        // ...and a near miss made of ordinary words is not a typo.
+        assertEquals("", strict(filter, "fresh bread baked day"));
+        // And short entries keep the guard.
+        assertEquals("", strict(filterOf("hotdog"), "hot dog"));
+    }
+
+    @Test
+    public void aLongEntryWithEveryLetterSeparatedIsStillCaught() {
+        final WordFilter filter = filterOf("freshbreadbakeddaily", "slow_green_river_ferry");
+        assertEquals(1, filter.strictSpans("f.r.e.s.h.b.r.e.a.d.b.a.k.e.d.d.a.i.l.y").size());
+        assertEquals(1, filter.strictSpans("f r e s h b r e a d b a k e d d a i l y").size());
+        assertEquals(1, filter.strictSpans("s.l.o.w.g.r.e.e.n.r.i.v.e.r.f.e.r.r.y").size());
+    }
 }

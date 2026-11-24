@@ -45,20 +45,28 @@ import java.util.Set;
  * </ol>
  *
  * The danger is blocking innocent text, and it is what the {@link CommonWords} guard is for: a run
- * made only of ordinary words is never blocked here, so {@code hell} and {@code help} stay safe
- * next to {@code hello}, and {@code al so} is not {@code also}. A single letter is never an ordinary
- * word.
+ * made only of ordinary words is never blocked here (unless three or more of them exactly spell
+ * an entry of {@link #LONG_EXACT} letters or more), so {@code hell} and {@code help} stay safe
+ * next to {@code hello}, and {@code al so} is not {@code also}. A single letter is not an ordinary
+ * word, except {@code a} and {@code I}.
  */
 final class FuzzyMatcher {
     /** The most characters that may separate two words of a run. */
     static final int MAX_GAP = 6;
     /** The most words a run may have. */
-    static final int MAX_RUN_TOKENS = 12;
+    static final int MAX_RUN_TOKENS = 24;
     /** Entries that squash to fewer letters than this are not matched strictly. */
     static final int MIN_SKELETON = 4;
     static final int MIN_TYPO_SINGLE = 6;
     static final int MIN_TYPO_PHRASE = 8;
     static final int TWO_TYPOS_FROM = 10;
+    /**
+     * An exact squash this long, made of at least {@link #LONG_EXACT_WORDS} words, is blocked even
+     * if every word in it is an ordinary one: nobody writes {@code fresh bread baked daily} by
+     * accident. Two ordinary words ({@code kitchen table}) stay protected.
+     */
+    static final int LONG_EXACT = 12;
+    static final int LONG_EXACT_WORDS = 3;
     private static final int MAX_COMBINATIONS = 8;
 
     private final CommonWords mWords;
@@ -66,18 +74,31 @@ final class FuzzyMatcher {
     /** Folded squash -> the length of the shortest entry that folds to it. */
     private final Map<String, Integer> mFolded = new HashMap<>();
     private final List<String> mSingleTypo = new ArrayList<>();
-    private final List<String> mPhraseTypo = new ArrayList<>();
+    private final List<PhraseEntry> mPhraseTypo = new ArrayList<>();
     private int mMaxSkeleton;
 
     FuzzyMatcher(final CommonWords words) {
         mWords = words;
     }
 
+    /** A phrase's squash, and how many words it was written with. */
+    private static final class PhraseEntry {
+        final String mSquash;
+        final int mWords;
+
+        PhraseEntry(final String squash, final int words) {
+            mSquash = squash;
+            mWords = words;
+        }
+    }
+
     /**
      * @param readings every reading of an entry (the words of a phrase joined).
-     * @param multiToken whether the entry is several words (a phrase, or one with underscores).
+     * @param words how many words the entry is written with: 1 for a single word, more for a phrase
+     * (or a word with underscores).
      */
-    void add(final Set<String> readings, final boolean multiToken) {
+    void add(final Set<String> readings, final int words) {
+        final boolean multiToken = words > 1;
         for (final String reading : readings) {
             final String squash = squash(reading);
             if (squash.length() < MIN_SKELETON) {
@@ -94,7 +115,7 @@ final class FuzzyMatcher {
             }
             if (multiToken) {
                 if (squash.length() >= MIN_TYPO_PHRASE) {
-                    mPhraseTypo.add(squash);
+                    mPhraseTypo.add(new PhraseEntry(squash, words));
                 }
             } else if (squash.length() >= MIN_TYPO_SINGLE) {
                 mSingleTypo.add(squash);
@@ -144,17 +165,22 @@ final class FuzzyMatcher {
                 if (shortest(squashes) > lengthLimit) {
                     break;
                 }
-                if (!allCommon && matches(squashes, last == first)) {
+                if (matches(squashes, last - first + 1, allCommon)) {
                     out.add(new int[] {tokens.get(first)[0], tokens.get(last)[1]});
                 }
             }
         }
     }
 
-    private boolean matches(final List<String> squashes, final boolean singleToken) {
+    private boolean matches(final List<String> squashes, final int tokenCount,
+            final boolean allCommon) {
         for (final String squash : squashes) {
-            if (mExact.contains(squash)) {
+            if (mExact.contains(squash) && (!allCommon
+                    || (squash.length() >= LONG_EXACT && tokenCount >= LONG_EXACT_WORDS))) {
                 return true;
+            }
+            if (allCommon) {
+                continue;
             }
             final String folded = fold(squash);
             if (folded.length() >= MIN_SKELETON) {
@@ -163,18 +189,41 @@ final class FuzzyMatcher {
                     return true;
                 }
             }
-            if (typo(squash, mPhraseTypo) || (singleToken && typo(squash, mSingleTypo))) {
+            if (phraseTypo(squash, tokenCount)
+                    || (tokenCount == 1 && typo(squash, mSingleTypo))) {
                 return true;
             }
         }
         return false;
     }
 
+    /**
+     * A typo in a phrase: as many words as the phrase has (or all run together as one), so a
+     * short word slipped between its words, as in {@code penny to marsh}, is not a typo.
+     */
+    private static boolean phraseTypo(final String squash, final List<PhraseEntry> entries,
+            final int tokenCount) {
+        for (final PhraseEntry entry : entries) {
+            if ((tokenCount == entry.mWords || tokenCount == 1) && withinTypos(squash, entry.mSquash)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean phraseTypo(final String squash, final int tokenCount) {
+        return phraseTypo(squash, mPhraseTypo, tokenCount);
+    }
+
+    private static boolean withinTypos(final String squash, final String entry) {
+        final int most = entry.length() >= TWO_TYPOS_FROM ? 2 : 1;
+        return Math.abs(squash.length() - entry.length()) <= most && !squash.equals(entry)
+                && withinEdits(squash, entry, most);
+    }
+
     private static boolean typo(final String squash, final List<String> entries) {
         for (final String entry : entries) {
-            final int most = entry.length() >= TWO_TYPOS_FROM ? 2 : 1;
-            if (Math.abs(squash.length() - entry.length()) <= most && !squash.equals(entry)
-                    && withinEdits(squash, entry, most)) {
+            if (withinTypos(squash, entry)) {
                 return true;
             }
         }
@@ -198,7 +247,9 @@ final class FuzzyMatcher {
 
     private boolean isCommon(final List<String> readings) {
         for (final String reading : readings) {
-            if (isLettersOnly(reading) && mWords.isWord(reading)) {
+            // "a" and "I" are real words; any other single letter is a fragment.
+            if (isLettersOnly(reading) && (mWords.isWord(reading)
+                    || reading.equals("a") || reading.equals("i"))) {
                 return true;
             }
         }
