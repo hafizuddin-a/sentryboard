@@ -76,5 +76,13 @@
             android:key="wordblock_add"
             android:title="@string/wordblock_add"
             android:summary="@string/wordblock_syntax_summary" />
+        <Preference
+            android:key="wordblock_bulk"
+            android:title="@string/wordblock_bulk"
+            android:summary="@string/wordblock_bulk_summary" />
+        <Preference
+            android:key="wordblock_check"
+            android:title="@string/wordblock_check"
+            android:summary="@string/wordblock_check_summary" />
     </PreferenceCategory>
 </PreferenceScreen>

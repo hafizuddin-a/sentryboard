@@ -44,6 +44,14 @@ import java.util.Set;
  *     and a typo never combine.</li>
  * </ol>
  *
+ * Two further disguises:
+ * <ul>
+ * <li><b>Dropped vowels</b>: the entry with some or all of its vowels left out, as in {@code kmqt}
+ *     or {@code mbr klt}. Only when at least {@link #MIN_DROP_CONSONANTS} other characters remain:
+ *     shorter forms collide with too many real words and abbreviations.</li>
+ * <li><b>Reversed order</b>: the two words of a two-word entry typed the other way round.</li>
+ * </ul>
+ *
  * The danger is blocking innocent text, and it is what the {@link CommonWords} guard is for: a run
  * made only of ordinary words is never blocked here (unless three or more of them exactly spell
  * an entry of {@link #LONG_EXACT} letters or more), so {@code hell} and {@code help} stay safe
@@ -69,6 +77,8 @@ final class FuzzyMatcher {
      */
     static final int LONG_EXACT = 12;
     static final int LONG_EXACT_WORDS = 3;
+    /** The fewest non-vowels a squash must keep for its dropped-vowel forms to be matched. */
+    static final int MIN_DROP_CONSONANTS = 4;
     private static final int MAX_COMBINATIONS = 8;
 
     private final CommonWords mWords;
@@ -77,6 +87,10 @@ final class FuzzyMatcher {
     private final Map<String, Integer> mFolded = new HashMap<>();
     private final List<String> mSingleTypo = new ArrayList<>();
     private final List<PhraseEntry> mPhraseTypo = new ArrayList<>();
+    /** Squash without vowels -> the entry squashes that read like that. */
+    private final Map<String, List<String>> mWithoutVowels = new HashMap<>();
+    /** The words of two-word entries swapped: first word typed -> second words that match. */
+    private final Map<String, Set<String>> mReversedPairs = new HashMap<>();
     private int mMaxSkeleton;
 
     FuzzyMatcher(final CommonWords words) {
@@ -95,11 +109,42 @@ final class FuzzyMatcher {
     }
 
     /**
-     * @param readings every reading of an entry (the words of a phrase joined).
-     * @param words how many words the entry is written with: 1 for a single word, more for a phrase
-     * (or a word with underscores).
+     * @param words every reading of each word of an entry, in order: one set for a single word,
+     * more for a phrase (or a word with underscores).
      */
-    void add(final Set<String> readings, final int words) {
+    void add(final List<Set<String>> words) {
+        addForm(joined(words), words.size());
+        if (words.size() == 2) {
+            final List<Set<String>> swapped = new ArrayList<>(2);
+            swapped.add(words.get(1));
+            swapped.add(words.get(0));
+            addForm(joined(swapped), 2);
+            for (final String first : words.get(1)) {
+                for (final String second : words.get(0)) {
+                    if (!squash(first).isEmpty() && !squash(second).isEmpty()) {
+                        Set<String> seconds = mReversedPairs.get(squash(first));
+                        if (seconds == null) {
+                            seconds = new HashSet<>();
+                            mReversedPairs.put(squash(first), seconds);
+                        }
+                        seconds.add(squash(second));
+                    }
+                }
+            }
+        }
+    }
+
+    /** Every way of reading the words, joined (at most {@link #MAX_COMBINATIONS} of them). */
+    private static Set<String> joined(final List<Set<String>> words) {
+        List<String> result = new ArrayList<>();
+        result.add("");
+        for (final Set<String> readings : words) {
+            result = join(result, new ArrayList<>(readings));
+        }
+        return new LinkedHashSet<>(result);
+    }
+
+    private void addForm(final Set<String> readings, final int words) {
         final boolean multiToken = words > 1;
         for (final String reading : readings) {
             final String squash = squash(reading);
@@ -108,6 +153,15 @@ final class FuzzyMatcher {
             }
             mExact.add(squash);
             mMaxSkeleton = Math.max(mMaxSkeleton, squash.length());
+            final String bare = withoutVowels(squash);
+            if (bare.length() >= MIN_DROP_CONSONANTS) {
+                List<String> entries = mWithoutVowels.get(bare);
+                if (entries == null) {
+                    entries = new ArrayList<>();
+                    mWithoutVowels.put(bare, entries);
+                }
+                entries.add(squash);
+            }
             final String folded = fold(squash);
             if (folded.length() >= MIN_SKELETON) {
                 final Integer shortest = mFolded.get(folded);
@@ -126,7 +180,7 @@ final class FuzzyMatcher {
     }
 
     boolean isEmpty() {
-        return mExact.isEmpty();
+        return mExact.isEmpty() && mReversedPairs.isEmpty();
     }
 
     /** @return the most text a match can span, so callers know how much to read back. */
@@ -136,7 +190,7 @@ final class FuzzyMatcher {
 
     /** Adds the [start, end) span of every disguised entry found anywhere in the text to out. */
     void spans(final CharSequence text, final List<int[]> out) {
-        if (mExact.isEmpty() || text == null) {
+        if (isEmpty() || text == null) {
             return;
         }
         spans(text, false, out);
@@ -167,11 +221,28 @@ final class FuzzyMatcher {
                 if (shortest(squashes) > lengthLimit) {
                     break;
                 }
-                if (matches(squashes, last - first + 1, allCommon)) {
+                // Two whole words, swapped: matched word for word, so ordinary words count too.
+                if ((last - first == 1 && isReversedPair(readings[first], readings[last]))
+                        || matches(squashes, last - first + 1, allCommon)) {
                     out.add(new int[] {tokens.get(first)[0], tokens.get(last)[1]});
                 }
             }
         }
+    }
+
+    private boolean isReversedPair(final List<String> first, final List<String> second) {
+        for (final String one : first) {
+            final Set<String> seconds = mReversedPairs.get(one);
+            if (seconds == null) {
+                continue;
+            }
+            for (final String two : second) {
+                if (seconds.contains(two)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean matches(final List<String> squashes, final int tokenCount,
@@ -183,6 +254,9 @@ final class FuzzyMatcher {
             }
             if (allCommon) {
                 continue;
+            }
+            if (isVowelDropped(squash)) {
+                return true;
             }
             final String folded = fold(squash);
             if (folded.length() >= MIN_SKELETON) {
@@ -288,6 +362,48 @@ final class FuzzyMatcher {
             shortest = Math.min(shortest, s.length());
         }
         return shortest;
+    }
+
+    /** @return true if the squash is an entry with one or more of its vowels left out. */
+    private boolean isVowelDropped(final String squash) {
+        final List<String> entries = mWithoutVowels.get(withoutVowels(squash));
+        if (entries == null) {
+            return false;
+        }
+        for (final String entry : entries) {
+            if (squash.length() < entry.length() && onlyVowelsMissing(squash, entry)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** @return true if {@code typed} is {@code entry} with only vowels taken out. */
+    static boolean onlyVowelsMissing(final String typed, final String entry) {
+        int next = 0;
+        for (int i = 0; i < entry.length(); i++) {
+            final char c = entry.charAt(i);
+            if (next < typed.length() && typed.charAt(next) == c) {
+                next++;
+            } else if (!isVowel(c)) {
+                return false;
+            }
+        }
+        return next == typed.length();
+    }
+
+    static String withoutVowels(final String squash) {
+        final StringBuilder sb = new StringBuilder(squash.length());
+        for (int i = 0; i < squash.length(); i++) {
+            if (!isVowel(squash.charAt(i))) {
+                sb.append(squash.charAt(i));
+            }
+        }
+        return sb.toString();
+    }
+
+    static boolean isVowel(final char c) {
+        return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u';
     }
 
     /** The letters and digits of a normalized reading, nothing else. */

@@ -25,10 +25,16 @@ import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceCategory;
 import android.preference.SwitchPreference;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
+import android.view.Gravity;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -50,8 +56,9 @@ import rkr.simplekeyboard.inputmethod.latin.wordblock.lock.SettingsLock;
  * What is editable follows {@link SettingsGate#canModifyFilterSettings()}, which is re-read every
  * time the screen is shown and again before each change. That is only the first layer: the data
  * layer ({@link BlockedWordStore}, {@link FilterSettingsWriter}) refuses changes while locked
- * whatever this screen does. While locked the blocked-word list can still be viewed, and words can
- * still be added to it; removing a word, and every other setting, is what is locked.
+ * whatever this screen does. While locked the blocked-word list is hidden and words can still be
+ * added to it (one at a time or many at once); removing a word, checking text against the list, and
+ * every other setting, is what is locked.
  */
 public final class WordBlockSettingsFragment extends SubScreenFragment {
     private static final String KEY_LOCK_CATEGORY = "lock_category";
@@ -62,6 +69,8 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     private static final String KEY_LOCK_DURATION = "lock_duration";
     private static final String KEY_LOCK_REMOVE = "lock_remove";
     private static final String KEY_LIST_CATEGORY = "wordblock_list";
+    private static final String KEY_BULK = "wordblock_bulk";
+    private static final String KEY_CHECK = "wordblock_check";
     private static final String KEY_ADD = "wordblock_add";
 
     private SettingsGate mGate;
@@ -79,6 +88,7 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     private SwitchPreference mIdleEnabled;
     private ListPreference mIdleDelay;
     private ListPreference mStrict;
+    private AlertDialog mCheckDialog;
     private final List<Preference> mEntryPreferences = new ArrayList<>();
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final Runnable mTick = this::onTick;
@@ -114,6 +124,8 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         mDuration.setOnPreferenceClickListener(p -> { changeDuration(); return true; });
         mRemove.setOnPreferenceClickListener(p -> { confirmRemoveLock(); return true; });
         findPreference(KEY_ADD).setOnPreferenceClickListener(p -> { showAddDialog(); return true; });
+        findPreference(KEY_BULK).setOnPreferenceClickListener(p -> { showBulkDialog(); return true; });
+        findPreference(KEY_CHECK).setOnPreferenceClickListener(p -> { showCheckDialog(); return true; });
 
         // These write through the gate; returning false leaves the switch where it was.
         mEnabled.setOnPreferenceChangeListener(
@@ -142,6 +154,7 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
     @Override
     public void onPause() {
         mHandler.removeCallbacks(mTick);
+        dismissCheckDialog(); // Leaving relocks the settings.
         super.onPause();
     }
 
@@ -164,6 +177,14 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         mStrict.setEnabled(editable);
         // Adding a word is always allowed, even while locked; only removing is not.
         findPreference(KEY_ADD).setEnabled(true);
+        findPreference(KEY_BULK).setEnabled(true);
+        // The answers reveal what is on the list, so this is for when it is shown anyway.
+        findPreference(KEY_CHECK).setEnabled(editable);
+        findPreference(KEY_CHECK).setSummary(editable ? R.string.wordblock_check_summary
+                : R.string.wordblock_check_locked);
+        if (!editable) {
+            dismissCheckDialog();
+        }
 
         refreshLockSection(state);
         refreshList(editable);
@@ -353,30 +374,41 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
         mEntryPreferences.add(preference);
     }
 
-    private void showAddDialog() {
-        final Context context = getActivity();
-        final EditText input = new EditText(context);
-        input.setHint(R.string.wordblock_add_hint);
-        input.setSingleLine(true);
-        // Typed here, the words would otherwise be caught by this very filter (and, with another
-        // keyboard, learned by it). A "visible password" field is skipped by the filter and is
-        // not learned or suggested by keyboards that respect it.
+    /**
+     * A field for typing words that are, or may be, on the list. Typed here they would otherwise
+     * be caught by this very filter (and, with another keyboard, learned by it). A "visible
+     * password" field is skipped by the filter and is not learned or suggested by keyboards that
+     * respect it.
+     */
+    private EditText wordInput(final int hint, final int extraInputType) {
+        final EditText input = new EditText(getActivity());
+        input.setHint(hint);
         input.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | extraInputType);
         input.setImeOptions(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
                 | EditorInfo.IME_ACTION_DONE);
+        return input;
+    }
 
-        final FrameLayout container = new FrameLayout(context);
-        final int margin = (int) (24 * context.getResources().getDisplayMetrics().density);
+    /** Puts a view into a frame with the side margins dialogs use. */
+    private View framed(final View view) {
+        final FrameLayout container = new FrameLayout(getActivity());
+        final int margin = (int) (24 * getResources().getDisplayMetrics().density);
         final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(margin, 0, margin, 0);
-        container.addView(input, params);
+        container.addView(view, params);
+        return container;
+    }
 
-        new AlertDialog.Builder(context)
+    private void showAddDialog() {
+        final EditText input = wordInput(R.string.wordblock_add_hint, 0);
+        input.setSingleLine(true);
+
+        new AlertDialog.Builder(getActivity())
                 .setTitle(R.string.wordblock_add_title)
-                .setView(container)
+                .setView(framed(input))
                 .setPositiveButton(R.string.wordblock_add_confirm,
                         (dialog, which) -> addEntry(input.getText().toString()))
                 .setNegativeButton(android.R.string.cancel, null)
@@ -402,6 +434,166 @@ public final class WordBlockSettingsFragment extends SubScreenFragment {
             toast(R.string.wordblock_added_hidden);
         }
         refresh();
+        // While the list is hidden, offer them whether or not the entry was new, so that the offer
+        // itself says nothing about what was already there.
+        if (WordFilter.isValidEntry(entry) && (listHidden || alreadyListed(entry))) {
+            showSuggestions(entry, listHidden);
+        }
+    }
+
+    /** Offers related forms of an entry, each unticked, to add as well. */
+    private void showSuggestions(final String entry, final boolean listHidden) {
+        final List<String> suggestions = mStore.suggestVariants(entry, listHidden);
+        if (suggestions.isEmpty()) {
+            return;
+        }
+        final CharSequence[] items = suggestions.toArray(new CharSequence[0]);
+        final boolean[] ticked = new boolean[items.length];
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.wordblock_suggest_title)
+                .setMultiChoiceItems(items, ticked,
+                        (dialog, which, isChecked) -> ticked[which] = isChecked)
+                .setPositiveButton(R.string.wordblock_suggest_confirm, (dialog, which) -> {
+                    final List<String> chosen = new ArrayList<>();
+                    for (int i = 0; i < ticked.length; i++) {
+                        if (ticked[i]) {
+                            chosen.add(suggestions.get(i));
+                        }
+                    }
+                    if (!chosen.isEmpty()) {
+                        addMany(chosen);
+                    }
+                })
+                .setNegativeButton(R.string.wordblock_suggest_skip, null)
+                .show();
+    }
+
+    private void showBulkDialog() {
+        final EditText input = wordInput(R.string.wordblock_bulk_hint,
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setSingleLine(false);
+        input.setImeOptions(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        input.setMinLines(5);
+        input.setMaxLines(10);
+        input.setGravity(Gravity.TOP | Gravity.START);
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.wordblock_bulk)
+                .setView(framed(input))
+                .setPositiveButton(R.string.wordblock_bulk_confirm, (dialog, which) -> {
+                    final List<String> lines =
+                            BlockedWordStore.splitEntries(input.getText().toString());
+                    if (!lines.isEmpty()) {
+                        addMany(lines);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void addMany(final List<String> lines) {
+        // While the list is hidden, "new" and "already there" are not told apart.
+        final boolean listHidden = !mGate.canModifyFilterSettings();
+        final BlockedWordStore.AddResult result = mStore.addAll(lines);
+        final String message;
+        if (result.saveFailed) {
+            message = getString(R.string.wordblock_save_failed);
+        } else if (listHidden) {
+            message = getString(R.string.wordblock_bulk_result_hidden,
+                    result.added + result.alreadyListed, result.unusable);
+        } else {
+            message = getString(R.string.wordblock_bulk_result, result.added,
+                    result.alreadyListed, result.unusable);
+        }
+        Toast.makeText(getActivity(), message, Toast.LENGTH_LONG).show();
+        refresh();
+    }
+
+    // ---- "Is it blocked?" ---------------------------------------------------------------------
+
+    private void showCheckDialog() {
+        if (!mGate.canModifyFilterSettings()) {
+            refresh();
+            return;
+        }
+        final EditText input = wordInput(R.string.wordblock_check_hint, 0);
+        input.setSingleLine(true);
+        final TextView answer = new TextView(getActivity());
+        answer.setText(R.string.wordblock_check_empty);
+        final int space = (int) (12 * getResources().getDisplayMetrics().density);
+        answer.setPadding(0, space, 0, 0);
+        final LinearLayout column = new LinearLayout(getActivity());
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.addView(input);
+        column.addView(answer);
+
+        input.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(final CharSequence s, final int start, final int count,
+                    final int after) {
+            }
+
+            @Override
+            public void onTextChanged(final CharSequence s, final int start, final int before,
+                    final int count) {
+            }
+
+            @Override
+            public void afterTextChanged(final Editable s) {
+                if (mGate.canModifyFilterSettings()) {
+                    answer.setText(verdict(s.toString()));
+                } else {
+                    refresh(); // The unlock window ended: this closes the dialog.
+                }
+            }
+        });
+
+        mCheckDialog = new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.wordblock_check_title)
+                .setView(framed(column))
+                .setPositiveButton(R.string.wordblock_check_close, null)
+                .show();
+    }
+
+    private void dismissCheckDialog() {
+        if (mCheckDialog != null) {
+            mCheckDialog.dismiss();
+            mCheckDialog = null;
+        }
+    }
+
+    /** What the filter would do with this text, as the list stands. */
+    private String verdict(final String text) {
+        if (text.trim().isEmpty()) {
+            return getString(R.string.wordblock_check_empty);
+        }
+        final SharedPreferences prefs = getSharedPreferences();
+        if (!Settings.readWordBlockEnabled(prefs)) {
+            return getString(R.string.wordblock_check_disabled);
+        }
+        final WordFilter filter = mStore.getFilter();
+        final List<int[]> exact = filter.blockedSpans(text);
+        if (!exact.isEmpty()) {
+            return getString(R.string.wordblock_check_everywhere, quoted(text, exact));
+        }
+        final List<int[]> strict = filter.strictSpans(text);
+        if (strict.isEmpty()) {
+            return getString(R.string.wordblock_check_no);
+        }
+        final String scope = Settings.readWordBlockStrict(prefs);
+        final int message = Settings.STRICT_ALL.equals(scope) ? R.string.wordblock_check_strict_all
+                : Settings.STRICT_OFF.equals(scope) ? R.string.wordblock_check_strict_off
+                : R.string.wordblock_check_strict_browsers;
+        return getString(message, quoted(text, strict));
+    }
+
+    private static String quoted(final String text, final List<int[]> spans) {
+        final StringBuilder sb = new StringBuilder();
+        for (final int[] span : spans) {
+            sb.append(sb.length() > 0 ? ", " : "").append('"')
+                    .append(text, span[0], span[1]).append('"');
+        }
+        return sb.toString();
     }
 
     private boolean alreadyListed(final String entry) {

@@ -241,4 +241,45 @@ public class BlockedWordStoreTest {
         final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
         assertEquals(Arrays.asList("two words", "other!"), store.getEntries());
     }
+
+    @Test
+    public void addAllAddsEveryUsableEntryAndCountsTheRest() {
+        final BlockedWordStore store = new BlockedWordStore(file(), OPEN);
+        assertTrue(store.add("word"));
+        final BlockedWordStore.AddResult result = store.addAll(Arrays.asList(
+                "word", "two   words", "TWO words", "x.y", "", "  ", "other!"));
+        assertEquals(2, result.added);
+        assertEquals(2, result.alreadyListed);
+        assertEquals(1, result.unusable);
+        assertFalse(result.saveFailed);
+        assertEquals(Arrays.asList("word", "two words", "other!"), store.getEntries());
+        assertEquals(store.getEntries(), new BlockedWordStore(file(), OPEN).getEntries());
+    }
+
+    @Test
+    public void addAllIsAllowedWhileLocked() {
+        final BlockedWordStore store = new BlockedWordStore(file(), () -> false);
+        assertEquals(2, store.addAll(Arrays.asList("one", "two")).added);
+        assertFalse(store.remove("one"));
+    }
+
+    @Test
+    public void addAllReportsAFailedSaveAndAddsNothing() throws IOException {
+        final File blocker = file();
+        assertTrue(blocker.mkdirs());
+        Files.write(new File(blocker, "x").toPath(), new byte[] {1});
+        final BlockedWordStore store = new BlockedWordStore(blocker, OPEN);
+        final BlockedWordStore.AddResult result = store.addAll(Arrays.asList("word"));
+        assertTrue(result.saveFailed);
+        assertEquals(0, result.added);
+        assertTrue(store.getEntries().isEmpty());
+    }
+
+    @Test
+    public void splitEntriesSplitsOnLinesAndCommas() {
+        assertEquals(Arrays.asList("one", "two words", "three!", " four"),
+                BlockedWordStore.splitEntries("one\ntwo words\r\nthree!, four\n\n,,"));
+        assertTrue(BlockedWordStore.splitEntries("  \n \r\n").isEmpty());
+        assertTrue(BlockedWordStore.splitEntries(null).isEmpty());
+    }
 }

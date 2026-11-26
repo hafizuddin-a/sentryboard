@@ -36,7 +36,7 @@ Requires Android 7.0 or later.
 
 ## Install
 
-1. On your phone, download `Sentryboard-1.2.1.apk` from the [Releases](../../releases) page.
+1. On your phone, download `Sentryboard-1.3.0.apk` from the [Releases](../../releases) page.
 2. Open it. Android asks you to allow installs from the app you downloaded it with (your browser or Files):
    allow it. Google Play Protect may say it has not seen the app before: tap **More details**, then
    **Install anyway**. That is because the app is not on the Play Store, not because anything is wrong.
@@ -50,7 +50,7 @@ signed with the same key (every release is). Do not uninstall first: that erases
 
 **Check the download:** the APK is signed with a key whose SHA-256 fingerprint is
 `9d:bf:4f:e2:12:32:e0:c0:64:3a:76:54:58:a7:34:12:0d:97:83:5b:89:a4:09:1c:96:36:a9:b2:db:5a:85:79`.
-You can see it with `apksigner verify --print-certs Sentryboard-1.2.1.apk`.
+You can see it with `apksigner verify --print-certs Sentryboard-1.3.0.apk`.
 
 Prefer to read the code first? It is all in this repository, and you can build it yourself (below).
 
@@ -100,7 +100,14 @@ app or off. (It is a filter setting, so it is locked while the settings are lock
 | `h.e.l.l.o w.o.r.l.d`, `h e l l o` | letters spread out (up to 6 characters between them) |
 | `heeello`, `hhhello` | repeated letters |
 | `helo wrld`, `hello wrld`, `gamblng`, `gmabling` | a mistyped letter (see below) |
+| `hll wrld`, `hllwrld`, `gmblng` | vowels left out (see below) |
+| `world hello` | the two words the other way round |
 
+- **Dropped vowels:** an entry with some or all of its vowels left out is caught (`mbr klt`, `mbr kolt` or `mbrklt`
+  for `amber kolt`), however it is spaced, as long as at least 4 other letters or digits remain. Shorter forms
+  such as `lmp` collide with too many real words, so add those to your list yourself (the app offers them).
+- **Reversed order:** the two words of a two-word entry typed the other way round (`kolt amber`). Ordinary words
+  count too, so with `hot dog` listed, "my dog hot" is caught. Entries of three or more words are not reordered.
 - **Typos** are caught for entries of 6 or more letters (8 for a phrase): one mistyped, added, missing or swapped
   letter, two for entries of 8 or more, which also covers a last word cut short or garbled by a letter or
   two (`amber kol`, `amber klo` for `amber kolt`). If what is left is itself an ordinary word (`amber lot`,
@@ -114,7 +121,10 @@ app or off. (It is a filter setting, so it is locked while the settings are lock
   `kitchen table` stay protected, so add such a pair as a phrase if you want it blocked.
 - **At the moment you search:** in strict mode, pressing Go, Search or Enter checks the **whole field**, not only
   the last word, and removes blocked text before the search is sent.
-- **Accuracy**, measured on random mistyped ordinary words against a 40-entry list: about 0.03% were wrongly
+- **Measured on a made-up list** for the dropped-vowel and reversed forms: 97-100% of two- and three-word
+  phrases caught, 85% of run-together single words, and no false hits on 105,000 ordinary words or 200,000
+  ordinary word pairs. Text-speak that spells out an entry's consonants will be caught.
+- **Accuracy** of the typo rule, measured on random mistyped ordinary words against a 40-entry list: about 0.03% were wrongly
   flagged; typos of entries of 6 or more letters were caught 83-95% of the time; splitting an entry in two with a
   space was caught 89% of the time (the rest split into two real words, which are deliberately left alone).
 - **Search suggestions.** Filling a suggestion into the search box (the little arrow on a suggestion) is caught like a
@@ -128,6 +138,20 @@ app or off. (It is a filter setting, so it is locked while the settings are lock
 - It does not use a machine-learning model and never goes online. If you want content-aware blocking of what a
   search *returns*, that has to happen outside the keyboard, for example with Android's **Private DNS** setting
   pointed at a family-safe DNS provider.
+
+## Adding and checking words
+
+Under *Word filter > Blocked words*:
+
+- **Add a word** adds one entry, then offers related forms to add as well: the words run together, two words the
+  other way round, and the forms without vowels. Tick the ones you want. Strict matching already catches most of
+  them in browsers; adding them blocks them in every app.
+- **Add many words** takes a pasted list, one entry per line or separated by commas.
+- **Check whether text is blocked** tells you what the filter would do with a word or sentence, without deleting
+  anything. It is only available while the settings are unlocked, because its answers show what is on the list.
+
+Adding (one or many, and the offered forms) stays available while the settings are locked. While the list is
+hidden, none of these screens say whether something was already on it.
 
 ## Settings lock
 
@@ -171,7 +195,7 @@ the unlock countdown while the settings are locked.
   space loses `hello world`).
 - It only works while Sentryboard is the active keyboard. English only: in other scripts, accents and marks
   are compared without, so a blocked word can match other words with the same base letters.
-- Letters that are repeated, separated or mistyped (`heeello`, `h e l l o`, `hel-lo`, `hellp`) are only caught
+- Letters that are repeated, separated, mistyped or missing vowels, and words in reverse order (`heeello`, `h e l l o`, `hel-lo`, `hellp`) are only caught
   by [strict matching](#strict-matching), which is on in browsers only by default. Never matched: an emoji in the
   middle of a word, circled letters, lookalike letters beyond the common Cyrillic and Greek ones, synonyms and
   slang, other languages, and a typo of a word shorter than 6 letters.

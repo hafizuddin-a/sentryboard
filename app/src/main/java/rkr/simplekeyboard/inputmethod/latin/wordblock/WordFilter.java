@@ -90,12 +90,12 @@ public final class WordFilter {
                 }
                 mPhrases.add(words, entry.mWildcard, entry.mInstant);
                 if (!entry.mWildcard) {
-                    mFuzzy.add(joined(words), words.size());
+                    mFuzzy.add(words);
                 }
                 continue;
             }
             if (!entry.mWildcard) {
-                mFuzzy.add(variantsOf(entry.mBody), wordCount(entry.mBody));
+                mFuzzy.add(wordsOf(entry.mBody));
             }
             for (final String variant : variantsOf(entry.mBody)) {
                 mMaxEntryLength = Math.max(mMaxEntryLength, variant.length());
@@ -113,34 +113,15 @@ public final class WordFilter {
         }
     }
 
-    /** How many words a body is written with: its parts between underscores (one if none). */
-    private static int wordCount(final String body) {
-        int count = 0;
+    /** The readings of each part of a body between underscores (just one if it has none). */
+    private static List<Set<String>> wordsOf(final String body) {
+        final List<Set<String>> words = new ArrayList<>();
         for (final String part : body.split("_")) {
             if (!part.isEmpty()) {
-                count++;
+                words.add(variantsOf(part));
             }
         }
-        return Math.max(1, count);
-    }
-
-    /** Every way of reading the words of a phrase, joined (at most MAX_VARIANTS of them). */
-    private static Set<String> joined(final List<Set<String>> words) {
-        Set<String> result = new LinkedHashSet<>();
-        result.add("");
-        for (final Set<String> readings : words) {
-            final Set<String> next = new LinkedHashSet<>();
-            for (final String prefix : result) {
-                for (final String reading : readings) {
-                    next.add(prefix + reading);
-                    if (next.size() >= MAX_VARIANTS) {
-                        break;
-                    }
-                }
-            }
-            result = next;
-        }
-        return result;
+        return words;
     }
 
     /**

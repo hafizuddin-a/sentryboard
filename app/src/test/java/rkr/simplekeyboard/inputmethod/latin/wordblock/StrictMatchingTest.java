@@ -327,4 +327,100 @@ public class StrictMatchingTest {
         assertEquals("plnks", strict(filterOf("planks"), "plnks"));
         assertEquals("", strict(filterOf("planks"), "plnk"));
     }
+
+    // --- dropped vowels ---
+
+    @Test
+    public void aPhraseWithItsVowelsDroppedIsCaughtHoweverItIsTyped() {
+        final WordFilter filter = filterOf("amber kolt");
+        for (final String typed : new String[] {"mbr klt", "mbr kolt", "amber klt", "mbrklt",
+                "m b r k l t", "m.b.r.k.l.t", "mbr  klt", "mbr_klt", "mbr, klt", "MBR KLT", "ambr klt"}) {
+            assertEquals(typed, typed, strict(filter, typed));
+        }
+        assertEquals("lv bard", strict(filterOf("olive board"), "lv bard"));
+        assertEquals("mbr klt", strict(filter, "go mbr klt now"));
+    }
+
+    @Test
+    public void longerPhrasesAndEntriesWithUnderscoresLoseVowelsToo() {
+        assertEquals("prks nd bns", strict(filterOf("parks need bins"), "prks nd bns"));
+        assertEquals("prks need bns", strict(filterOf("parks need bins"), "prks need bns"));
+        assertEquals("grn mbrll", strict(filterOf("green umbrella"), "grn mbrll"));
+        assertEquals("prpl mntn", strict(filterOf("purple mountain"), "prpl mntn"));
+        assertEquals("snk cs", strict(filterOf("snake_case"), "snk cs"));
+        assertEquals("bx tl", strict(filterOf("box tile"), "bx tl"));
+    }
+
+    @Test
+    public void aSingleWordWithItsVowelsDroppedIsCaught() {
+        final WordFilter filter = filterOf("kumquat", "sandstorm");
+        assertEquals("kmqt", strict(filter, "kmqt"));
+        assertEquals("sndstrm", strict(filter, "sndstrm"));
+        assertEquals("km qt", strict(filter, "km qt"));
+        assertEquals("kumqt", strict(filter, "kumqt"));
+    }
+
+    @Test
+    public void droppedVowelsNeedFourConsonantsAndOnlyVowelsMayBeMissing() {
+        assertEquals("", strict(filterOf("lamp"), "lmp"));        // three consonants
+        assertEquals("", strict(filterOf("pea yo"), "p y"));      // two
+        assertEquals("", strict(filterOf("kumquat"), "kmq"));     // a consonant is missing
+        assertEquals("", strict(filterOf("kumquat"), "mkqt"));    // out of order
+        assertEquals("", strict(filterOf("amber kolt"), "mbr k"));
+        assertEquals("", strict(filterOf("sandstorm"), "sound strum"));
+    }
+
+    @Test
+    public void ordinaryWordsAreNotTakenForAPhraseWithoutItsVowels() {
+        // "brand" is "bread end" minus vowels in letters, but it is a word.
+        assertEquals("", strict(filterOf("bread end"), "brand"));
+        assertEquals("", strict(filterOf("bread end"), "brand new day"));
+    }
+
+    @Test
+    public void onlyVowelsMissingAndWithoutVowels() {
+        assertTrue(FuzzyMatcher.onlyVowelsMissing("kmqt", "kumquat"));
+        assertTrue(FuzzyMatcher.onlyVowelsMissing("ambrklt", "amberkolt"));
+        assertFalse(FuzzyMatcher.onlyVowelsMissing("kmq", "kumquat"));
+        assertFalse(FuzzyMatcher.onlyVowelsMissing("kumqaut", "kumquat"));
+        assertEquals("mbrklt", FuzzyMatcher.withoutVowels("amberkolt"));
+    }
+
+    // --- reversed order ---
+
+    @Test
+    public void aTwoWordEntryTypedTheOtherWayRoundIsCaught() {
+        final WordFilter filter = filterOf("amber kolt", "snake_case");
+        assertEquals("kolt amber", strict(filter, "kolt amber"));
+        assertEquals("kolt, amber", strict(filter, "see kolt, amber now"));
+        assertEquals("koltamber", strict(filter, "koltamber"));
+        assertEquals("case snake", strict(filter, "case snake"));
+        assertEquals("K0LT amber", strict(filter, "K0LT amber"));
+        // Reversed and vowel-less or mistyped at once.
+        assertEquals("klt mbr", strict(filter, "klt mbr"));
+        assertEquals("kolt ambber", strict(filter, "kolt ambber"));
+    }
+
+    @Test
+    public void ordinaryWordsReversedAreCaughtToo() {
+        assertEquals("dog hot", strict(filterOf("hot dog"), "my dog hot now"));
+        assertEquals("chair desk", strict(filterOf("desk chair"), "a chair desk"));
+    }
+
+    @Test
+    public void reversalNeedsTheWholeWordsSideBySide() {
+        final WordFilter filter = filterOf("hot dog");
+        assertEquals("", strict(filter, "dog is hot"));
+        assertEquals("", strict(filter, "dogs hot"));
+        assertEquals("", strict(filter, "dog........hot"));
+        // Three-word entries are not reordered.
+        assertEquals("", strict(filterOf("one two three"), "three two one"));
+    }
+
+    @Test
+    public void exactMatchingIsNotChangedByEitherRule() {
+        final WordFilter filter = filterOf("amber kolt");
+        assertTrue(filter.blockedSpans("kolt amber").isEmpty());
+        assertTrue(filter.blockedSpans("mbr klt").isEmpty());
+    }
 }

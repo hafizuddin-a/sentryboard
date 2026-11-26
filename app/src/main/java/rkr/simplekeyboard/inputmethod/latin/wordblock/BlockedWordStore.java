@@ -105,6 +105,16 @@ public final class BlockedWordStore {
         }
     }
 
+    /**
+     * Related forms of an entry worth offering (see {@link VariantSuggester}).
+     *
+     * @param hideList true while the list is hidden: forms already on it are then offered too, so
+     * that the suggestions give nothing away.
+     */
+    public List<String> suggestVariants(final String entry, final boolean hideList) {
+        return VariantSuggester.suggest(entry, hideList ? null : mFilter, mCommonWords);
+    }
+
     /** @return the current filter. Never null, and safe to call on every keystroke. */
     public WordFilter getFilter() {
         return mFilter;
@@ -130,6 +140,65 @@ public final class BlockedWordStore {
         final List<String> updated = new ArrayList<>(mEntries);
         updated.add(entry);
         return commit(updated);
+    }
+
+    /** What became of the lines of a bulk add. */
+    public static final class AddResult {
+        public final int added;
+        public final int alreadyListed;
+        public final int unusable;
+        /** True if the new entries could not be saved: then nothing was added. */
+        public final boolean saveFailed;
+
+        AddResult(final int added, final int alreadyListed, final int unusable,
+                final boolean saveFailed) {
+            this.added = added;
+            this.alreadyListed = alreadyListed;
+            this.unusable = unusable;
+            this.saveFailed = saveFailed;
+        }
+    }
+
+    /**
+     * Adds several entries at once, saving the list once. Like {@link #add}, this is allowed while
+     * the settings are locked. Blank lines are skipped and not counted.
+     */
+    public synchronized AddResult addAll(final List<String> rawEntries) {
+        final List<String> updated = new ArrayList<>(mEntries);
+        int added = 0;
+        int alreadyListed = 0;
+        int unusable = 0;
+        for (final String raw : rawEntries) {
+            if (raw == null || raw.trim().isEmpty()) {
+                continue;
+            }
+            final String entry = clean(raw);
+            if (entry == null) {
+                unusable++;
+            } else if (indexOf(updated, entry) >= 0) {
+                alreadyListed++;
+            } else {
+                updated.add(entry);
+                added++;
+            }
+        }
+        if (added > 0 && !commit(updated)) {
+            return new AddResult(0, alreadyListed, unusable, true);
+        }
+        return new AddResult(added, alreadyListed, unusable, false);
+    }
+
+    /** Splits pasted text into entries: one per line, or separated by commas. */
+    public static List<String> splitEntries(final String pasted) {
+        final List<String> entries = new ArrayList<>();
+        if (pasted != null) {
+            for (final String part : pasted.split("[\\r\\n,]+")) {
+                if (!part.trim().isEmpty()) {
+                    entries.add(part);
+                }
+            }
+        }
+        return entries;
     }
 
     /** @return true if an entry was removed; false if the settings are locked or it is not listed. */
